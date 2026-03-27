@@ -29,10 +29,9 @@ create policy "activity_log_select_admin" on public.activity_log
   for select using (public.current_role() = 'admin-it');
 
 -- -------------------------------------------------------
--- Enable Realtime
--- (Run in Dashboard > Database > Replication if not done via SQL)
--- alter publication supabase_realtime add table public.activity_log;
+-- Enable Realtime (REQUIRED for live feed)
 -- -------------------------------------------------------
+alter publication supabase_realtime add table public.activity_log;
 
 -- -------------------------------------------------------
 -- TRIGGER FUNCTIONS
