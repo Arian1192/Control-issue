@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 type Issue = Database['public']['Tables']['issues']['Row']
 type Comment = Database['public']['Tables']['issue_comments']['Row']
 type Device = Database['public']['Tables']['devices']['Row']
+type Assignee = { id: string; name: string; role: string }
 
 const STATUS_OPTIONS: IssueStatus[] = ['abierto', 'en-progreso', 'resuelto', 'cerrado']
 const MAX_FILE_BYTES = 5 * 1024 * 1024 // 5 MB
@@ -29,6 +30,7 @@ export default function IssueDetailPage() {
   const [devices, setDevices] = useState<Device[]>([])
   const [selectedDevice, setSelectedDevice] = useState('')
   const [startingSession, setStartingSession] = useState(false)
+  const [assignees, setAssignees] = useState<Assignee[]>([])
   const commentsEndRef = useRef<HTMLDivElement>(null)
 
   const canInitiateRemote =
@@ -47,6 +49,18 @@ export default function IssueDetailPage() {
         setLoading(false)
       })
   }, [id])
+
+  // Fetch technicians + admins for assignment (admin-it only)
+  useEffect(() => {
+    if (profile?.role !== 'admin-it') return
+    supabase
+      .from('profiles')
+      .select('id, name, role')
+      .in('role', ['technician', 'admin-it'])
+      .eq('is_active', true)
+      .order('name')
+      .then(({ data }) => setAssignees(data ?? []))
+  }, [profile?.role])
 
   // Fetch devices for remote session (only for technician/admin)
   useEffect(() => {
@@ -87,6 +101,21 @@ export default function IssueDetailPage() {
   useEffect(() => {
     commentsEndRef.current?.scrollIntoView({ behavior: 'smooth' })
   }, [comments])
+
+  async function handleAssign(assigneeId: string) {
+    if (!id) return
+    const newAssignedTo = assigneeId || null
+    const { data } = await supabase
+      .from('issues')
+      .update({
+        assigned_to: newAssignedTo,
+        status: newAssignedTo && issue?.status === 'abierto' ? 'en-progreso' : issue?.status,
+      })
+      .eq('id', id)
+      .select()
+      .single()
+    if (data) setIssue(data)
+  }
 
   async function handleStatusChange(newStatus: IssueStatus) {
     if (!id) return
@@ -197,6 +226,30 @@ export default function IssueDetailPage() {
           <span>Estado: <strong>{issue.status}</strong></span>
         </div>
       </div>
+
+      {/* Assignment (admin-it only) */}
+      {profile?.role === 'admin-it' && (
+        <div className="rounded-lg border bg-card p-4">
+          <h2 className="mb-3 text-sm font-semibold">Asignación</h2>
+          <select
+            value={issue.assigned_to ?? ''}
+            onChange={(e) => handleAssign(e.target.value)}
+            className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+          >
+            <option value="">Sin asignar</option>
+            {assignees.map((a) => (
+              <option key={a.id} value={a.id}>
+                {a.name} ({a.role})
+              </option>
+            ))}
+          </select>
+          {issue.assigned_to && (
+            <p className="mt-1 text-xs text-muted-foreground">
+              Asignado. Al asignar a alguien el estado pasa automáticamente a <strong>en-progreso</strong>.
+            </p>
+          )}
+        </div>
+      )}
 
       {/* Remote assistance (task 6.4) */}
       {canInitiateRemote && (
