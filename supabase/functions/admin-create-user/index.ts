@@ -33,22 +33,26 @@ Deno.serve(async (req: Request) => {
     const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
     const anonKey = Deno.env.get('SUPABASE_ANON_KEY')!
 
-    // Client using caller's JWT to check their role
-    const callerClient = createClient(supabaseUrl, anonKey, {
-      global: { headers: { Authorization: authHeader } },
-    })
+    // Admin client with service role for privileged operations
+    const adminClient = createClient(supabaseUrl, serviceRoleKey)
 
-    const { data: profile, error: profileError } = await callerClient
+    // Verify the caller's JWT and get their user record
+    const token = authHeader.replace('Bearer ', '')
+    const { data: { user }, error: userError } = await adminClient.auth.getUser(token)
+    if (userError || !user) {
+      return json({ error: 'Invalid or expired token' }, 401)
+    }
+
+    // Check caller role using service role client (bypasses RLS)
+    const { data: profile, error: profileError } = await adminClient
       .from('profiles')
       .select('role')
+      .eq('id', user.id)
       .single()
 
     if (profileError || profile?.role !== 'admin-it') {
       return json({ error: 'Forbidden: admin-it role required' }, 403)
     }
-
-    // Admin client with service role for privileged operations
-    const adminClient = createClient(supabaseUrl, serviceRoleKey)
 
     const payload: CreateUserPayload = await req.json()
 
