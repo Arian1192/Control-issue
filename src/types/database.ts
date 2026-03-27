@@ -5,6 +5,18 @@ export type Role = 'admin-it' | 'technician' | 'user'
 export type IssueStatus = 'abierto' | 'en-progreso' | 'resuelto' | 'cerrado'
 export type IssuePriority = 'baja' | 'media' | 'alta' | 'critica'
 export type SessionStatus = 'pendiente' | 'activa' | 'rechazada' | 'finalizada' | 'fallida'
+export type ActivityEventType =
+  | 'issue_created'
+  | 'status_changed'
+  | 'issue_assigned'
+  | 'comment_added'
+  | 'attachment_added'
+  | 'session_started'
+  | 'session_ended'
+  | 'session_rejected'
+  | 'user_created'
+  | 'user_deactivated'
+  | 'user_reactivated'
 
 export interface Database {
   public: {
@@ -89,6 +101,19 @@ export interface Database {
         }
         Insert: Omit<Database['public']['Tables']['remote_sessions']['Row'], 'id'>
         Update: Partial<Database['public']['Tables']['remote_sessions']['Insert']>
+      }
+      activity_log: {
+        Row: {
+          id: string
+          type: ActivityEventType
+          actor_id: string | null
+          entity_type: string | null
+          entity_id: string | null
+          metadata: Record<string, string | null>
+          created_at: string
+        }
+        Insert: never
+        Update: never
       }
     }
   }

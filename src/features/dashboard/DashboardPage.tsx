@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabaseClient'
 import { useAuth } from '@/features/auth/useAuth'
 import type { Database } from '@/types'
 import { cn } from '@/lib/utils'
+import ActivityFeed from '@/features/admin/ActivityFeed'
 
 type Issue = Database['public']['Tables']['issues']['Row']
 type RemoteSession = Database['public']['Tables']['remote_sessions']['Row']
@@ -149,6 +150,9 @@ export default function DashboardPage() {
           </div>
         )}
       </div>
+
+      {/* 4.2 Activity feed — admin-it only */}
+      {isAdmin && <ActivityFeed />}
     </div>
   )
 }
