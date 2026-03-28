@@ -123,8 +123,10 @@ Esta es la forma más rápida de probar sin necesitar 2 máquinas físicas.
   TURN_SECRET=<secret-compartido-con-supabase>
   TURN_REALM=turn.tudominio.com
   TURN_EXTERNAL_IP=<ip-publica-del-vps>
+  TURN_MIN_PORT=56000
+  TURN_MAX_PORT=56100
   ```
-- Verificá que los puertos UDP `3478` y `56000-56100` no estén bloqueados por el firewall.
+- Verificá que los puertos UDP `3478` y el rango `TURN_MIN_PORT`-`TURN_MAX_PORT` no estén bloqueados por el firewall.
 - En el mismo PC o misma LAN, TURN no es necesario.
 
 ### Error "No podés eliminar el dispositivo porque tiene una sesión en curso"
@@ -145,4 +147,6 @@ VITE_TURN_URL=turns:turn.tudominio.com:5349
 TURN_SECRET=<secret-compartido-con-supabase>
 TURN_REALM=turn.tudominio.com
 TURN_EXTERNAL_IP=<ip-publica-del-vps>
+TURN_MIN_PORT=56000
+TURN_MAX_PORT=56100
 ```

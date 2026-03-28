@@ -16,25 +16,13 @@ services:
     image: coturn/coturn:latest
     restart: unless-stopped
     command:
-      - -n
-      - --fingerprint
-      - --lt-cred-mech
-      - --use-auth-secret
-      - --static-auth-secret=${TURN_SECRET}
-      - --realm=${TURN_REALM}
-      - --external-ip=${TURN_EXTERNAL_IP}
-      - --listening-port=3478
-      - --tls-listening-port=5349
-      - --min-port=56000
-      - --max-port=56100
-      - --no-multicast-peers
-      - --no-loopback-peers
-      - --denied-peer-ip=10.0.0.0-10.255.255.255
-      - --denied-peer-ip=172.16.0.0-172.31.255.255
-      - --denied-peer-ip=192.168.0.0-192.168.255.255
-      - --no-cli
-      - --log-file=stdout
-      - --simple-log
+      - /bin/sh
+      - -ec
+      - |
+        while IFS= read -r line || [ -n "$$line" ]; do
+          eval "printf '%s\n' \"$$line\""
+        done < /etc/coturn/turnserver.conf.template > /tmp/turnserver.conf
+        exec turnserver -c /tmp/turnserver.conf -n
     ports:
       - '3478:3478/udp'
       - '3478:3478/tcp'
@@ -44,6 +32,10 @@ services:
       - TURN_SECRET=${TURN_SECRET}
       - TURN_REALM=${TURN_REALM}
       - TURN_EXTERNAL_IP=${TURN_EXTERNAL_IP}
+      - TURN_MIN_PORT=${TURN_MIN_PORT:-56000}
+      - TURN_MAX_PORT=${TURN_MAX_PORT:-56100}
+    volumes:
+      - ./coturn.conf:/etc/coturn/turnserver.conf.template:ro
     networks:
       - internal
 
