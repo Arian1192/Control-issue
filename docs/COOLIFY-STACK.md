@@ -33,6 +33,6 @@ CLOUDFLARE_TUNNEL_TOKEN=
 
 ## Nota sobre Coturn
 
-`coturn` ahora usa un archivo plantilla (`coturn.conf`) y, al arrancar, genera `/tmp/turnserver.conf` expandiendo las variables de entorno dentro del contenedor antes de ejecutar `turnserver -c ...`. Esto evita la fragilidad de una lista larga de flags CLI en Coolify y también evita depender de interpolación automática dentro de `turnserver.conf`, que Coturn no hace por sí solo.
+`coturn` ahora se construye con una imagen propia mínima desde este repo. La imagen copia `coturn.conf` y `scripts/start-coturn.sh` dentro del contenedor y, al arrancar, genera `/tmp/turnserver.conf` expandiendo las variables de entorno antes de ejecutar `turnserver -c ...`. Esto evita la fragilidad de una lista larga de flags CLI en Coolify y también evita depender de bind mounts de un solo archivo, que en despliegues Stack-from-Git de Coolify pueden resolverse mal en runtime.
 
 El rango UDP de relay queda controlado por `TURN_MIN_PORT` y `TURN_MAX_PORT` (por defecto `56000-56100`) para evitar conflictos operativos del host y mantener una apertura de firewall más compacta.
