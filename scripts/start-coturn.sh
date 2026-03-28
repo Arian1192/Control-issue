@@ -11,11 +11,14 @@ TURN_EXTERNAL_IP="${TURN_EXTERNAL_IP-}"
 : "${TURN_MIN_PORT:=56000}"
 : "${TURN_MAX_PORT:=56100}"
 
-# Auto-detect the container's local IP for relay socket binding.
-# coturn needs relay-ip = local interface, external-ip = public IP to advertise.
-TURN_RELAY_IP=$(hostname -i | awk '{print $1}')
+# In Docker, external-ip must be PUBLIC/PRIVATE so coturn binds relay sockets
+# to the container IP but advertises the public IP to TURN clients.
+if [ -n "$TURN_EXTERNAL_IP" ]; then
+  CONTAINER_IP=$(hostname -i | awk '{print $1}')
+  TURN_EXTERNAL_IP="${TURN_EXTERNAL_IP}/${CONTAINER_IP}"
+fi
 
-export TURN_SECRET TURN_REALM TURN_EXTERNAL_IP TURN_MIN_PORT TURN_MAX_PORT TURN_RELAY_IP
+export TURN_SECRET TURN_REALM TURN_EXTERNAL_IP TURN_MIN_PORT TURN_MAX_PORT
 
 while IFS= read -r line || [ -n "$line" ]; do
   eval "printf '%s\\n' \"$line\""
