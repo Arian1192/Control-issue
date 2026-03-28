@@ -81,7 +81,7 @@ function getEventStyle(type: ActivityEventType, meta: Record<string, string | nu
 // 3.7 Event label
 // -------------------------------------------------------
 function getEventLabel(event: ActivityLog): { title: string; detail?: string } {
-  const m = event.metadata
+  const m = (event.metadata ?? {}) as Record<string, string | null>
   switch (event.type) {
     case 'issue_created':
       return { title: `${m.created_by_name ?? 'Sistema'} creó "${m.title}"`, detail: m.priority ?? undefined }
@@ -187,7 +187,7 @@ export default function ActivityFeed({ variant = 'card', channelName = 'activity
   // 3.4 + 3.5 Client-side filter
   const filtered = filter === 'all'
     ? events
-    : events.filter((e) => CATEGORY_TYPES[filter].includes(e.type))
+    : events.filter((e) => CATEGORY_TYPES[filter].includes(e.type as ActivityEventType))
 
   const isDrawer = variant === 'drawer'
 
@@ -259,7 +259,7 @@ export default function ActivityFeed({ variant = 'card', channelName = 'activity
         )}
 
         {!loading && filtered.map((event) => {
-          const style  = getEventStyle(event.type, event.metadata)
+          const style  = getEventStyle(event.type as ActivityEventType, (event.metadata ?? {}) as Record<string, string | null>)
           const label  = getEventLabel(event)
           // 3.9 clickable if entity is an issue
           const isClickable = event.entity_type === 'issue' && event.entity_id
