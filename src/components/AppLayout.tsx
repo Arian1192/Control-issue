@@ -82,6 +82,7 @@ export default function AppLayout() {
 
   useEffect(() => {
     if (!profile) return
+    const profileId = profile.id
 
     async function markOnline() {
       const ip_local = await getLocalIp()
@@ -92,7 +93,7 @@ export default function AppLayout() {
           is_online: true,
           ...(ip_local !== null && { ip_local }),
         })
-        .eq('owner_id', profile.id)
+        .eq('owner_id', profileId)
     }
 
     void markOnline()
@@ -102,7 +103,7 @@ export default function AppLayout() {
 
     return () => {
       clearInterval(interval)
-      void supabase.from('devices').update({ is_online: false }).eq('owner_id', profile.id)
+      void supabase.from('devices').update({ is_online: false }).eq('owner_id', profileId)
     }
   }, [profile])
 
@@ -113,6 +114,7 @@ export default function AppLayout() {
       return
     }
 
+    const profileId = profile.id
     let isMounted = true
     const ownedDeviceIds = new Set<string>()
 
@@ -120,7 +122,7 @@ export default function AppLayout() {
       const { data: devices } = await supabase
         .from('devices')
         .select('*')
-        .eq('owner_id', profile.id)
+        .eq('owner_id', profileId)
 
       if (!isMounted) return
 
@@ -153,7 +155,7 @@ export default function AppLayout() {
     void refreshDevicesAndPending()
 
     const sessionChannel = supabase
-      .channel(`incoming_sessions:${profile.id}`)
+      .channel(`incoming_sessions:${profileId}`)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'remote_sessions' },
@@ -192,10 +194,10 @@ export default function AppLayout() {
       .subscribe()
 
     const deviceChannel = supabase
-      .channel(`owned_devices:${profile.id}`)
+      .channel(`owned_devices:${profileId}`)
       .on(
         'postgres_changes',
-        { event: '*', schema: 'public', table: 'devices', filter: `owner_id=eq.${profile.id}` },
+        { event: '*', schema: 'public', table: 'devices', filter: `owner_id=eq.${profileId}` },
         () => {
           void refreshDevicesAndPending()
         }
