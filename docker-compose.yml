@@ -1,0 +1,43 @@
+services:
+  app:
+    build:
+      context: .
+      args:
+        VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
+        VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
+        VITE_TURN_URL: ${VITE_TURN_URL:-}
+    restart: unless-stopped
+    networks:
+      - internal
+
+  coturn:
+    image: coturn/coturn:latest
+    restart: unless-stopped
+    volumes:
+      - ./coturn.conf:/etc/coturn/turnserver.conf:ro
+    ports:
+      - "3478:3478/udp"
+      - "3478:3478/tcp"
+      - "5349:5349/tcp"
+      - "49152-65535:49152-65535/udp"
+    environment:
+      - TURN_SECRET=${TURN_SECRET}
+      - TURN_REALM=${TURN_REALM}
+      - TURN_EXTERNAL_IP=${TURN_EXTERNAL_IP}
+    networks:
+      - internal
+
+  cloudflared:
+    image: cloudflare/cloudflared:latest
+    restart: unless-stopped
+    command: tunnel --no-autoupdate run
+    environment:
+      - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - app
+    networks:
+      - internal
+
+networks:
+  internal:
+    driver: bridge
