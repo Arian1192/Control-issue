@@ -17,12 +17,15 @@ while IFS= read -r line || [ -n "$line" ]; do
   eval "printf '%s\\n' \"$line\""
 done < "$TEMPLATE_PATH" > "$CONFIG_PATH"
 
-# Append one external-ip=PUBLIC/PRIVATE line per container interface so coturn
-# correctly advertises the public IP regardless of which interface it picks for relay.
+# Append external-ip=PUBLIC/LOCAL so coturn binds relay sockets to the host's
+# default-route interface and advertises the public IP to TURN clients.
 if [ -n "$TURN_EXTERNAL_IP" ]; then
-  for ip in $(hostname -i); do
-    echo "external-ip=${TURN_EXTERNAL_IP}/${ip}" >> "$CONFIG_PATH"
-  done
+  LOCAL_IP=$(ip route get 1 2>/dev/null | grep -oE 'src [0-9.]+' | awk '{print $2}')
+  if [ -n "$LOCAL_IP" ]; then
+    echo "external-ip=${TURN_EXTERNAL_IP}/${LOCAL_IP}" >> "$CONFIG_PATH"
+  else
+    echo "external-ip=${TURN_EXTERNAL_IP}" >> "$CONFIG_PATH"
+  fi
 fi
 
 exec turnserver -c "$CONFIG_PATH" -n
