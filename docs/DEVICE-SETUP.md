@@ -124,7 +124,7 @@ Esta es la forma más rápida de probar sin necesitar 2 máquinas físicas.
   TURN_REALM=turn.tudominio.com
   TURN_EXTERNAL_IP=<ip-publica-del-vps>
   ```
-- Verificá que los puertos UDP (3478, 49152-65535) no estén bloqueados por el firewall.
+- Verificá que los puertos UDP `3478` y `56000-56100` no estén bloqueados por el firewall.
 - En el mismo PC o misma LAN, TURN no es necesario.
 
 ### Error "No podés eliminar el dispositivo porque tiene una sesión en curso"
