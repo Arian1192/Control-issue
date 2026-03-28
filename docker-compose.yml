@@ -16,13 +16,7 @@ services:
     image: coturn/coturn:latest
     restart: unless-stopped
     command:
-      - /bin/sh
-      - -ec
-      - |
-        while IFS= read -r line || [ -n "$$line" ]; do
-          eval "printf '%s\n' \"$$line\""
-        done < /etc/coturn/turnserver.conf.template > /tmp/turnserver.conf
-        exec turnserver -c /tmp/turnserver.conf -n
+      - /usr/local/bin/start-coturn.sh
     ports:
       - '3478:3478/udp'
       - '3478:3478/tcp'
@@ -36,6 +30,7 @@ services:
       - TURN_MAX_PORT=${TURN_MAX_PORT:-56100}
     volumes:
       - ./coturn.conf:/etc/coturn/turnserver.conf.template:ro
+      - ./scripts/start-coturn.sh:/usr/local/bin/start-coturn.sh:ro
     networks:
       - internal
 
