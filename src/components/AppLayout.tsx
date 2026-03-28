@@ -1,4 +1,5 @@
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { getLocalIp } from '@/lib/getLocalIp'
 import {
   LayoutDashboard,
   AlertCircle,
@@ -7,14 +8,17 @@ import {
   LogOut,
   Menu,
   X,
+  Activity,
 } from 'lucide-react'
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import ActivityFeedDrawer from '@/components/ActivityFeedDrawer'
 import { supabase } from '@/lib/supabaseClient'
 import { useAuth } from '@/features/auth/useAuth'
 import type { Database } from '@/types'
 import { cn } from '@/lib/utils'
 
 type RemoteSession = Database['public']['Tables']['remote_sessions']['Row']
+type Device = Database['public']['Tables']['devices']['Row']
 
 interface NavItem {
   to: string
@@ -50,74 +54,177 @@ const NAV_ITEMS: NavItem[] = [
   },
 ]
 
+function sortPendingSessions(sessions: RemoteSession[]) {
+  return [...sessions].sort((a, b) => a.target_device_id.localeCompare(b.target_device_id))
+}
+
 export default function AppLayout() {
   const { profile, signOut } = useAuth()
   const location = useLocation()
   const navigate = useNavigate()
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [pendingSession, setPendingSession] = useState<RemoteSession | null>(null)
+  const [drawerOpen, setDrawerOpen] = useState(false)
+  const [pendingSessions, setPendingSessions] = useState<RemoteSession[]>([])
+  const [devicesById, setDevicesById] = useState<Record<string, Device>>({})
 
-  // Listen for incoming remote session requests (task 6.5)
+  const visibleItems = NAV_ITEMS.filter((item) => !profile || item.roles.includes(profile.role))
+  const accessDenied = (location.state as { accessDenied?: boolean } | null)?.accessDenied
+  const pendingCount = pendingSessions.length
+
+  const pendingSessionCards = useMemo(
+    () =>
+      pendingSessions.map((session) => ({
+        session,
+        device: devicesById[session.target_device_id] ?? null,
+      })),
+    [devicesById, pendingSessions]
+  )
+
   useEffect(() => {
     if (!profile) return
 
-    const channel = supabase
-      .channel('incoming_sessions')
+    async function markOnline() {
+      const ip_local = await getLocalIp()
+      await supabase
+        .from('devices')
+        .update({
+          last_seen: new Date().toISOString(),
+          is_online: true,
+          ...(ip_local !== null && { ip_local }),
+        })
+        .eq('owner_id', profile.id)
+    }
+
+    void markOnline()
+    const interval = setInterval(() => {
+      void markOnline()
+    }, 30_000)
+
+    return () => {
+      clearInterval(interval)
+      void supabase.from('devices').update({ is_online: false }).eq('owner_id', profile.id)
+    }
+  }, [profile])
+
+  useEffect(() => {
+    if (!profile) {
+      setPendingSessions([])
+      setDevicesById({})
+      return
+    }
+
+    let isMounted = true
+    const ownedDeviceIds = new Set<string>()
+
+    async function refreshDevicesAndPending() {
+      const { data: devices } = await supabase
+        .from('devices')
+        .select('*')
+        .eq('owner_id', profile.id)
+
+      if (!isMounted) return
+
+      const nextDevices = devices ?? []
+      ownedDeviceIds.clear()
+      nextDevices.forEach((device) => ownedDeviceIds.add(device.id))
+      setDevicesById(
+        Object.fromEntries(nextDevices.map((device) => [device.id, device])) as Record<string, Device>
+      )
+
+      if (nextDevices.length === 0) {
+        setPendingSessions([])
+        return
+      }
+
+      const { data: sessions } = await supabase
+        .from('remote_sessions')
+        .select('*')
+        .in(
+          'target_device_id',
+          nextDevices.map((device) => device.id)
+        )
+        .eq('status', 'pendiente')
+
+      if (isMounted) {
+        setPendingSessions(sortPendingSessions((sessions ?? []) as RemoteSession[]))
+      }
+    }
+
+    void refreshDevicesAndPending()
+
+    const sessionChannel = supabase
+      .channel(`incoming_sessions:${profile.id}`)
       .on(
         'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'remote_sessions',
-          filter: `status=eq.pendiente`,
-        },
-        async (payload) => {
+        { event: 'INSERT', schema: 'public', table: 'remote_sessions' },
+        (payload) => {
           const session = payload.new as RemoteSession
-          // Check if this session targets a device owned by current user
-          const { data: device } = await supabase
-            .from('devices')
-            .select('owner_id')
-            .eq('id', session.target_device_id)
-            .single()
-          if (device?.owner_id === profile.id) {
-            setPendingSession(session)
-          }
+          if (!ownedDeviceIds.has(session.target_device_id) || session.status !== 'pendiente') return
+
+          setPendingSessions((current) => {
+            const next = current.some((item) => item.id === session.id)
+              ? current.map((item) => (item.id === session.id ? session : item))
+              : [...current, session]
+            return sortPendingSessions(next)
+          })
+        }
+      )
+      .on(
+        'postgres_changes',
+        { event: 'UPDATE', schema: 'public', table: 'remote_sessions' },
+        (payload) => {
+          const session = payload.new as RemoteSession
+          if (!ownedDeviceIds.has(session.target_device_id)) return
+
+          setPendingSessions((current) => {
+            if (session.status !== 'pendiente') {
+              return current.filter((item) => item.id !== session.id)
+            }
+
+            const exists = current.some((item) => item.id === session.id)
+            const next = exists
+              ? current.map((item) => (item.id === session.id ? session : item))
+              : [...current, session]
+            return sortPendingSessions(next)
+          })
         }
       )
       .subscribe()
 
-    return () => { supabase.removeChannel(channel) }
+    const deviceChannel = supabase
+      .channel(`owned_devices:${profile.id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'devices', filter: `owner_id=eq.${profile.id}` },
+        () => {
+          void refreshDevicesAndPending()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      isMounted = false
+      void supabase.removeChannel(sessionChannel)
+      void supabase.removeChannel(deviceChannel)
+    }
   }, [profile])
 
-  async function acceptSession() {
-    if (!pendingSession) return
-    await supabase
-      .from('remote_sessions')
-      .update({ status: 'activa', started_at: new Date().toISOString() })
-      .eq('id', pendingSession.id)
-    const sessionId = pendingSession.id
-    setPendingSession(null)
+  function acceptSession(sessionId: string) {
+    setPendingSessions((current) => current.filter((session) => session.id !== sessionId))
     navigate(`/remote/${sessionId}`)
   }
 
-  async function rejectSession() {
-    if (!pendingSession) return
+  async function rejectSession(sessionId: string) {
     await supabase
       .from('remote_sessions')
-      .update({ status: 'rechazada' })
-      .eq('id', pendingSession.id)
-    setPendingSession(null)
+      .update({ status: 'rechazada', ended_at: new Date().toISOString() })
+      .eq('id', sessionId)
+
+    setPendingSessions((current) => current.filter((session) => session.id !== sessionId))
   }
-
-  const visibleItems = NAV_ITEMS.filter(
-    (item) => !profile || item.roles.includes(profile.role)
-  )
-
-  const accessDenied = (location.state as { accessDenied?: boolean } | null)?.accessDenied
 
   return (
     <div className="flex h-screen overflow-hidden bg-background">
-      {/* Mobile overlay */}
       {sidebarOpen && (
         <div
           className="fixed inset-0 z-20 bg-black/50 lg:hidden"
@@ -125,7 +232,6 @@ export default function AppLayout() {
         />
       )}
 
-      {/* Sidebar */}
       <aside
         className={cn(
           'fixed inset-y-0 left-0 z-30 flex w-56 flex-col border-r bg-card transition-transform lg:static lg:translate-x-0',
@@ -166,6 +272,16 @@ export default function AppLayout() {
         </nav>
 
         <div className="border-t p-2">
+          {profile?.role === 'admin-it' && (
+            <button
+              onClick={() => setDrawerOpen(true)}
+              className="flex w-full items-center gap-2 rounded-md px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
+              aria-label="Abrir feed de actividad"
+            >
+              <Activity className="h-4 w-4" />
+              Actividad en vivo
+            </button>
+          )}
           <div className="mb-2 px-3 py-1">
             <p className="truncate text-sm font-medium">{profile?.name}</p>
             <p className="truncate text-xs text-muted-foreground">{profile?.role}</p>
@@ -180,35 +296,60 @@ export default function AppLayout() {
         </div>
       </aside>
 
-      {/* Main content */}
       <div className="flex flex-1 flex-col overflow-hidden">
         <header className="flex h-14 items-center border-b px-4 lg:hidden">
           <button onClick={() => setSidebarOpen(true)} aria-label="Abrir menú">
             <Menu className="h-5 w-5" />
           </button>
           <span className="ml-3 font-semibold">Control Issue</span>
+          {profile?.role === 'admin-it' && (
+            <button
+              onClick={() => setDrawerOpen(true)}
+              className="ml-auto rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+              aria-label="Abrir feed de actividad"
+            >
+              <Activity className="h-5 w-5" />
+            </button>
+          )}
         </header>
 
-        {/* Incoming session notification banner (task 6.5) */}
-        {pendingSession && (
-          <div className="flex items-center justify-between border-b bg-yellow-50 px-4 py-3 text-sm text-yellow-900">
-            <span className="flex items-center gap-2">
+        {pendingCount > 0 && (
+          <div className="border-b bg-yellow-50 px-4 py-3 text-yellow-900">
+            <div className="mb-2 flex items-center gap-2 text-sm font-medium">
               <Monitor className="h-4 w-4 shrink-0" />
-              Un técnico solicita acceso remoto a tu dispositivo.
-            </span>
-            <div className="flex gap-2">
-              <button
-                onClick={acceptSession}
-                className="rounded-md bg-green-600 px-3 py-1 text-xs font-medium text-white hover:bg-green-700"
-              >
-                Aceptar
-              </button>
-              <button
-                onClick={rejectSession}
-                className="rounded-md bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700"
-              >
-                Rechazar
-              </button>
+              Tenés {pendingCount} solicitud{pendingCount > 1 ? 'es' : ''} remota{pendingCount > 1 ? 's' : ''} pendiente{pendingCount > 1 ? 's' : ''}.
+            </div>
+            <div className="space-y-2">
+              {pendingSessionCards.map(({ session, device }) => (
+                <div
+                  key={session.id}
+                  className="flex flex-col gap-2 rounded-md border border-yellow-200 bg-white/70 px-3 py-2 text-sm md:flex-row md:items-center md:justify-between"
+                >
+                  <div>
+                    <p>
+                      Un técnico solicita acceso remoto a{' '}
+                      <strong>{device?.name ?? 'tu dispositivo'}</strong>.
+                    </p>
+                    <p className="text-xs text-yellow-800/80">
+                      Sesión {session.id.slice(0, 8)}…
+                    </p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button
+                      onClick={() => acceptSession(session.id)}
+                      className="rounded-md bg-green-600 px-3 py-1 text-xs font-medium text-white hover:bg-green-700"
+                    >
+                      Abrir y aceptar
+                    </button>
+                    <button
+                      onClick={() => rejectSession(session.id)}
+                      className="rounded-md bg-red-600 px-3 py-1 text-xs font-medium text-white hover:bg-red-700"
+                    >
+                      Rechazar
+                    </button>
+                  </div>
+                </div>
+              ))}
             </div>
           </div>
         )}
@@ -216,12 +357,14 @@ export default function AppLayout() {
         <main className="flex-1 overflow-y-auto p-6">
           {accessDenied && (
             <div className="mb-4 rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive">
-              No tienes permisos para acceder a esa sección.
+              No tenés permisos para acceder a esa sección.
             </div>
           )}
           <Outlet />
         </main>
       </div>
+
+      <ActivityFeedDrawer open={drawerOpen} onOpenChange={setDrawerOpen} />
     </div>
   )
 }

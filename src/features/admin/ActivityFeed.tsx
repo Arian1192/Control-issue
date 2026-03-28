@@ -128,7 +128,12 @@ function formatRelative(dateStr: string): string {
 // -------------------------------------------------------
 // Component
 // -------------------------------------------------------
-export default function ActivityFeed() {
+interface ActivityFeedProps {
+  variant?: 'card' | 'drawer'
+  channelName?: string
+}
+
+export default function ActivityFeed({ variant = 'card', channelName = 'activity_feed' }: ActivityFeedProps) {
   const navigate = useNavigate()
   const [events, setEvents] = useState<ActivityLog[]>([])
   const [loading, setLoading] = useState(true)
@@ -154,7 +159,7 @@ export default function ActivityFeed() {
 
     // 3.2 Realtime: prepend new events
     const channel = supabase
-      .channel('activity_feed')
+      .channel(channelName)
       .on(
         'postgres_changes',
         { event: 'INSERT', schema: 'public', table: 'activity_log' },
@@ -163,7 +168,7 @@ export default function ActivityFeed() {
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
-  }, [])
+  }, [channelName])
 
   // 3.3 Load more
   async function loadMore() {
@@ -184,25 +189,49 @@ export default function ActivityFeed() {
     ? events
     : events.filter((e) => CATEGORY_TYPES[filter].includes(e.type))
 
-  return (
-    <div className="rounded-lg border bg-card">
-      {/* Header with Live indicator (3.10) */}
-      <div className="flex items-center justify-between border-b px-4 py-3">
-        <div className="flex items-center gap-2">
-          <span className="relative flex h-2 w-2">
-            <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
-            <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
-          </span>
-          <h2 className="text-sm font-semibold">Actividad</h2>
-          {events.length > 0 && (
-            <span className="rounded-full bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
-              {events.length}
-            </span>
-          )}
-        </div>
+  const isDrawer = variant === 'drawer'
 
-        {/* 3.4 Filter chips */}
-        <div className="flex gap-1">
+  return (
+    <div className={cn(!isDrawer && 'rounded-lg border bg-card', isDrawer && 'flex h-full flex-col')}>
+      {/* Header: solo en modo card (el drawer tiene el suyo propio) */}
+      {!isDrawer && (
+        <div className="flex items-center justify-between border-b px-4 py-3">
+          <div className="flex items-center gap-2">
+            <span className="relative flex h-2 w-2">
+              <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-green-400 opacity-75" />
+              <span className="relative inline-flex h-2 w-2 rounded-full bg-green-500" />
+            </span>
+            <h2 className="text-sm font-semibold">Actividad</h2>
+            {events.length > 0 && (
+              <span className="rounded-full bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                {events.length}
+              </span>
+            )}
+          </div>
+
+          {/* 3.4 Filter chips */}
+          <div className="flex gap-1">
+            {FILTERS.map((f) => (
+              <button
+                key={f.id}
+                onClick={() => setFilter(f.id)}
+                className={cn(
+                  'rounded-full px-2.5 py-0.5 text-xs font-medium transition-colors',
+                  filter === f.id
+                    ? 'bg-primary text-primary-foreground'
+                    : 'text-muted-foreground hover:bg-accent hover:text-foreground'
+                )}
+              >
+                {f.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Filter chips en modo drawer: barra dedicada debajo del header del drawer */}
+      {isDrawer && (
+        <div className="flex flex-wrap gap-1 border-b px-4 py-2">
           {FILTERS.map((f) => (
             <button
               key={f.id}
@@ -218,10 +247,10 @@ export default function ActivityFeed() {
             </button>
           ))}
         </div>
-      </div>
+      )}
 
       {/* Feed */}
-      <div className="max-h-96 overflow-y-auto">
+      <div className={cn(isDrawer ? 'flex-1 overflow-y-auto' : 'max-h-96 overflow-y-auto')}>
         {loading && (
           <p className="px-4 py-6 text-center text-sm text-muted-foreground">Cargando actividad...</p>
         )}
