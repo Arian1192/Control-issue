@@ -15,6 +15,7 @@ jobs:
           PRIMARY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
           FALLBACK_MANUAL_WEBHOOK_URL: ${{ secrets.COOLIFY_MANUAL_WEBHOOK_URL }}
           FALLBACK_MANUAL_WEBHOOK_SECRET: ${{ secrets.COOLIFY_MANUAL_WEBHOOK_SECRET }}
+          FALLBACK_MANUAL_DEPLOY_BRANCH: ${{ secrets.COOLIFY_MANUAL_DEPLOY_BRANCH }}
         run: |
           set -euo pipefail
 
@@ -27,53 +28,68 @@ jobs:
 
           trigger_manual_fallback() {
             local manual_url="${FALLBACK_MANUAL_WEBHOOK_URL:-http://coolify.ariancoro.com/webhooks/source/github/events/manual}"
+            local branch_from_ref="${GITHUB_REF#refs/heads/}"
+            local branches=("${branch_from_ref}")
             local payload
             local signature
             local response
             local body
             local code
+            local branch
 
-            payload=$(jq -nc \
-              --arg ref "${GITHUB_REF}" \
-              --arg full_name "${GITHUB_REPOSITORY}" \
-              --arg after "${GITHUB_SHA}" \
-              '{
-                ref: $ref,
-                repository: { full_name: $full_name },
-                commits: [{ added: [], removed: [], modified: [] }],
-                after: $after
-              }')
-
-            signature=$(printf '%s' "${payload}" | openssl dgst -sha256 -hmac "${FALLBACK_MANUAL_WEBHOOK_SECRET:-}" | awk '{print $2}')
-
-            response=$(curl --silent --show-error \
-              --write-out "\n%{http_code}" \
-              --request POST \
-              --header "Content-Type: application/json" \
-              --header "X-GitHub-Event: push" \
-              --header "X-Hub-Signature-256: sha256=${signature}" \
-              --data "${payload}" \
-              "${manual_url}")
-
-            body=$(printf '%s' "${response}" | sed '$d')
-            code=$(printf '%s' "${response}" | tail -n1)
-
-            echo "${body}"
-
-            if [ "${code}" -ge 400 ]; then
-              echo "Manual webhook fallback failed with HTTP ${code}."
-              return 1
+            if [ -n "${FALLBACK_MANUAL_DEPLOY_BRANCH:-}" ] && [ "${FALLBACK_MANUAL_DEPLOY_BRANCH}" != "${branch_from_ref}" ]; then
+              branches+=("${FALLBACK_MANUAL_DEPLOY_BRANCH}")
             fi
 
-            if echo "${body}" | grep -qi "Nothing to do"; then
-              echo "Manual webhook fallback did not match any deployable application."
-              return 1
+            if [ "${branch_from_ref}" != "Arian1192/portable-remote-agent-pivot" ]; then
+              branches+=("Arian1192/portable-remote-agent-pivot")
             fi
 
-            if echo "${body}" | grep -q '"status":"failed"'; then
-              echo "Manual webhook fallback returned failed application status."
-              return 1
-            fi
+            for branch in "${branches[@]}"; do
+              payload=$(jq -nc \
+                --arg ref "refs/heads/${branch}" \
+                --arg full_name "${GITHUB_REPOSITORY}" \
+                --arg after "${GITHUB_SHA}" \
+                '{
+                  ref: $ref,
+                  repository: { full_name: $full_name },
+                  commits: [{ added: [], removed: [], modified: [] }],
+                  after: $after
+                }')
+
+              signature=$(printf '%s' "${payload}" | openssl dgst -sha256 -hmac "${FALLBACK_MANUAL_WEBHOOK_SECRET:-}" | awk '{print $2}')
+
+              response=$(curl --silent --show-error \
+                --write-out "\n%{http_code}" \
+                --request POST \
+                --header "Content-Type: application/json" \
+                --header "X-GitHub-Event: push" \
+                --header "X-Hub-Signature-256: sha256=${signature}" \
+                --data "${payload}" \
+                "${manual_url}")
+
+              body=$(printf '%s' "${response}" | sed '$d')
+              code=$(printf '%s' "${response}" | tail -n1)
+
+              echo "Manual fallback (${branch}) => ${body}"
+
+              if [ "${code}" -ge 400 ]; then
+                continue
+              fi
+
+              if echo "${body}" | grep -qi "Nothing to do"; then
+                continue
+              fi
+
+              if echo "${body}" | grep -q '"status":"failed"'; then
+                continue
+              fi
+
+              return 0
+            done
+
+            echo "Manual webhook fallback did not queue any deployment."
+            return 1
           }
 
           if ! trigger_primary; then
