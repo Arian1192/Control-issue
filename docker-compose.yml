@@ -16,8 +16,7 @@ services:
     image: ghcr.io/ylianst/meshcentral:latest
     restart: unless-stopped
     volumes:
-      - ./meshcentral/config.json:/opt/meshcentral/meshcentral-data/config.json:ro
-      - meshcentral-data-v4:/opt/meshcentral/meshcentral-data
+      - ./meshcentral:/opt/meshcentral/meshcentral-data
       - meshcentral-files-v4:/opt/meshcentral/meshcentral-files
     environment:
       - NODE_ENV=production
@@ -44,5 +43,4 @@ networks:
     driver: bridge
 
 volumes:
-  meshcentral-data-v4:
   meshcentral-files-v4:
