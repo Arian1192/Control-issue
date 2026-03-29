@@ -1,6 +1,7 @@
 {
   "$schema": "http://info.meshcentral.com/downloads/meshcentral-config-schema.json",
   "settings": {
+    "SelfUpdate": false,
     "Cert": "mesh.ariancoro.com",
     "Port": 80,
     "AliasPort": 443,
