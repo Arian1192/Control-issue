@@ -1,16 +1,16 @@
 {
   "$schema": "http://info.meshcentral.com/downloads/meshcentral-config-schema.json",
   "settings": {
-    "Cert": "${MESHCENTRAL_HOSTNAME}",
-    "Port": 443,
+    "Cert": "mesh.ariancoro.com",
+    "Port": 80,
     "AliasPort": 443,
-    "RedirPort": 80,
+    "RedirPort": 0,
     "AgentPong": 300,
     "AllowLoginToken": true,
     "AllowFraming": true,
     "WebRTC": false,
     "IgnoreAgentHashCheck": false,
-    "TlsOffload": "127.0.0.1"
+    "TlsOffload": true
   },
   "domains": {
     "": {
