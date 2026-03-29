@@ -24,7 +24,14 @@ services:
 
   rustdesk-hbbs:
     image: rustdesk/rustdesk-server:latest
-    command: hbbs -r ${RUSTDESK_RELAY_HOST:-rd.tudominio.com:21117} -k ${RUSTDESK_KEY}
+    command:
+      - /bin/sh
+      - -lc
+      - |
+        if [ -n "${RUSTDESK_KEY:-}" ]; then
+          exec hbbs -r "${RUSTDESK_RELAY_HOST:-rd.tudominio.com:21117}" -k "${RUSTDESK_KEY}"
+        fi
+        exec hbbs -r "${RUSTDESK_RELAY_HOST:-rd.tudominio.com:21117}"
     environment:
       - ALWAYS_USE_RELAY=${RUSTDESK_ALWAYS_USE_RELAY:-N}
     volumes:
@@ -40,7 +47,14 @@ services:
 
   rustdesk-hbbr:
     image: rustdesk/rustdesk-server:latest
-    command: hbbr -k ${RUSTDESK_KEY}
+    command:
+      - /bin/sh
+      - -lc
+      - |
+        if [ -n "${RUSTDESK_KEY:-}" ]; then
+          exec hbbr -k "${RUSTDESK_KEY}"
+        fi
+        exec hbbr
     volumes:
       - rustdesk-data-v1:/root
     restart: unless-stopped
