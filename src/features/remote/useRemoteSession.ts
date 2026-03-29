@@ -5,19 +5,16 @@ import type { Database, SessionStatus } from '@/types'
 type RemoteSession = Database['public']['Tables']['remote_sessions']['Row']
 type RemoteSessionUpdate = Database['public']['Tables']['remote_sessions']['Update']
 
-const MESHCENTRAL_URL = import.meta.env.VITE_MESHCENTRAL_URL as string | undefined
-const MESHCENTRAL_AGENT_DOWNLOAD_URL = import.meta.env.VITE_MESHCENTRAL_AGENT_DOWNLOAD_URL as
-  | string
-  | undefined
-const MESHCENTRAL_AGENT_WINDOWS_URL = import.meta.env.VITE_MESHCENTRAL_AGENT_WINDOWS_URL as
-  | string
-  | undefined
-const MESHCENTRAL_AGENT_MAC_INTEL_URL = import.meta.env.VITE_MESHCENTRAL_AGENT_MAC_INTEL_URL as
-  | string
-  | undefined
-const MESHCENTRAL_AGENT_MAC_ARM_URL = import.meta.env.VITE_MESHCENTRAL_AGENT_MAC_ARM_URL as
-  | string
-  | undefined
+function getEnv(name: string) {
+  const value = (import.meta.env[name] as string | undefined)?.trim()
+  return value ? value : undefined
+}
+
+const MESHCENTRAL_URL = getEnv('VITE_MESHCENTRAL_URL')
+const MESHCENTRAL_AGENT_DOWNLOAD_URL = getEnv('VITE_MESHCENTRAL_AGENT_DOWNLOAD_URL')
+const MESHCENTRAL_AGENT_WINDOWS_URL = getEnv('VITE_MESHCENTRAL_AGENT_WINDOWS_URL')
+const MESHCENTRAL_AGENT_MAC_INTEL_URL = getEnv('VITE_MESHCENTRAL_AGENT_MAC_INTEL_URL')
+const MESHCENTRAL_AGENT_MAC_ARM_URL = getEnv('VITE_MESHCENTRAL_AGENT_MAC_ARM_URL')
 const OPEN_STATUSES: SessionStatus[] = ['pendiente', 'aceptada', 'activa']
 
 function toAbsoluteUrl(baseUrl: string | undefined, path: string) {
