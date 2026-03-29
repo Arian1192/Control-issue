@@ -116,21 +116,30 @@ export default function RemoteSessionPage() {
         </div>
       )}
 
-      <div className="overflow-hidden rounded-lg border bg-black">
-        <video
-          ref={videoRef}
-          autoPlay
-          playsInline
-          muted
-          className="w-full"
-          style={{ minHeight: '320px' }}
-        />
-        {!remoteStream && (
-          <div className="flex h-40 items-center justify-center">
-            <p className="text-sm text-gray-400">Sin señal de vídeo todavía...</p>
-          </div>
-        )}
-      </div>
+      {!canShareScreen ? (
+        <div className="overflow-hidden rounded-lg border bg-black">
+          <video
+            ref={videoRef}
+            autoPlay
+            playsInline
+            muted
+            className="w-full"
+            style={{ minHeight: '320px' }}
+          />
+          {!remoteStream && (
+            <div className="flex h-40 items-center justify-center">
+              <p className="text-sm text-gray-400">Sin señal de vídeo todavía...</p>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="rounded-lg border bg-card px-4 py-8 text-sm text-muted-foreground">
+          <p>
+            Tu pantalla se compartirá con el técnico remoto. El streaming solo se muestra en su
+            equipo.
+          </p>
+        </div>
+      )}
 
       <div className="flex gap-2">
         {canShareScreen && isSessionOpen && (
