@@ -9,7 +9,7 @@ export type {
 
 export type SessionConnectionPhase =
   | 'idle'
-  | 'offer_sent'
-  | 'answer_received'
+  | 'signaling'
   | 'connected'
+  | 'closing'
   | 'failed'

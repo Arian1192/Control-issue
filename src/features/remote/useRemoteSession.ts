@@ -26,9 +26,14 @@ export function useRemoteSession(sessionId: string | null, userId: string | null
         .update(update)
         .eq('id', sessionId)
 
-      if (!updateError) {
-        syncLocalSession(update)
+      if (updateError) {
+        setError(updateError.message)
+        return false
       }
+
+      setError(null)
+      syncLocalSession(update)
+      return true
     },
     [sessionId, syncLocalSession]
   )

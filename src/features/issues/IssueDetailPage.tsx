@@ -30,6 +30,7 @@ export default function IssueDetailPage() {
   const [devices, setDevices] = useState<Device[]>([])
   const [selectedDevice, setSelectedDevice] = useState('')
   const [startingSession, setStartingSession] = useState(false)
+  const [remoteError, setRemoteError] = useState<string | null>(null)
   const [assignees, setAssignees] = useState<Assignee[]>([])
   const commentsEndRef = useRef<HTMLDivElement>(null)
 
@@ -65,14 +66,40 @@ export default function IssueDetailPage() {
   // Fetch devices for remote session (only for technician/admin)
   useEffect(() => {
     if (!canInitiateRemote || !issue?.created_by) return
-    supabase
-      .from('devices')
-      .select('*')
-      .eq('owner_id', issue.created_by)
-      .then(({ data }) => {
-        setDevices(data ?? [])
-        if (data?.[0]) setSelectedDevice(data[0].id)
-      })
+    const ownerId = issue.created_by
+
+    async function loadDevices() {
+      const { data } = await supabase
+        .from('devices')
+        .select('*')
+        .eq('owner_id', ownerId)
+
+      setDevices(data ?? [])
+      if (data?.length) {
+        setSelectedDevice((current) =>
+          current && data.some((device) => device.id === current) ? current : data[0].id
+        )
+      } else {
+        setSelectedDevice('')
+      }
+    }
+
+    void loadDevices()
+
+    const channel = supabase
+      .channel(`issue_devices:${ownerId}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'devices', filter: `owner_id=eq.${ownerId}` },
+        () => {
+          void loadDevices()
+        }
+      )
+      .subscribe()
+
+    return () => {
+      void supabase.removeChannel(channel)
+    }
   }, [canInitiateRemote, issue?.created_by])
 
   // Fetch and subscribe to comments
@@ -170,9 +197,10 @@ export default function IssueDetailPage() {
 
   async function handleStartRemoteSession() {
     if (!selectedDevice || !profile || !id) return
+    setRemoteError(null)
     const device = devices.find((d) => d.id === selectedDevice)
     if (!device?.is_online) {
-      alert('El dispositivo no está en línea.')
+      setRemoteError('El dispositivo no está en línea todavía. Esperá a que el usuario aparezca como disponible.')
       return
     }
 
@@ -189,7 +217,12 @@ export default function IssueDetailPage() {
       .single()
 
     setStartingSession(false)
-    if (!error && data) {
+    if (error) {
+      setRemoteError(error.message)
+      return
+    }
+
+    if (data) {
       navigate(`/remote/${data.id}`)
     }
   }
@@ -258,6 +291,11 @@ export default function IssueDetailPage() {
             <Monitor className="h-4 w-4" />
             Asistencia remota
           </h2>
+          {remoteError && (
+            <div className="mb-3 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-xs text-red-800">
+              {remoteError}
+            </div>
+          )}
           {devices.length === 0 ? (
             <p className="text-xs text-muted-foreground">
               El usuario no tiene dispositivos registrados.

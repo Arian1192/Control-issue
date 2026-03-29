@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { ExternalLink, XCircle } from 'lucide-react'
 import { useAuth } from '@/features/auth/useAuth'
@@ -38,7 +38,6 @@ export default function RemoteSessionPage() {
   const { sessionId } = useParams<{ sessionId: string }>()
   const { profile } = useAuth()
   const navigate = useNavigate()
-  const viewerStartedRef = useRef(false)
   const [deviceOwnerId, setDeviceOwnerId] = useState<string | null>(null)
 
   const {
@@ -65,14 +64,6 @@ export default function RemoteSessionPage() {
 
   const isSharer = !!deviceOwnerId && deviceOwnerId === profile?.id
   const isViewer = session?.initiated_by === profile?.id
-
-  useEffect(() => {
-    if (!session || !isViewer || viewerStartedRef.current) return
-    if (session.status !== 'aceptada') return
-
-    viewerStartedRef.current = true
-    void startAsViewer()
-  }, [isViewer, session, startAsViewer])
 
   const sessionStatus = session?.status
   const isOpen = !!sessionStatus && OPEN_STATUSES.includes(sessionStatus)
@@ -174,7 +165,7 @@ export default function RemoteSessionPage() {
           <div className="text-center">
             <h2 className="text-base font-semibold">Instalá el agente de asistencia remota</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Para que el técnico pueda ver tu pantalla, descargá e instalá el agente de Control Issue.
+              Para continuar la asistencia, descargá e instalá el agente remoto. El técnico va a seguir desde MeshCentral en otra pestaña.
             </p>
           </div>
 
@@ -199,14 +190,16 @@ export default function RemoteSessionPage() {
           <ol className="mx-auto max-w-xs space-y-1 text-sm text-muted-foreground">
             <li>1. Descargá el instalador</li>
             <li>2. Ejecutalo y seguí los pasos</li>
-            <li>3. El técnico se conectará automáticamente</li>
+            <li>3. Avisale al técnico cuando el agente quede listo</li>
           </ol>
         </div>
       )}
 
       {isSharer && isActive && (
         <div className="rounded-lg border bg-card p-6 text-center">
-          <p className="text-sm text-muted-foreground">Sesión activa. El técnico puede ver tu pantalla.</p>
+          <p className="text-sm text-muted-foreground">
+            Sesión en curso. El técnico continúa la asistencia desde MeshCentral.
+          </p>
         </div>
       )}
 
@@ -230,19 +223,30 @@ export default function RemoteSessionPage() {
       {isViewer && isAccepted && (
         <div className="space-y-4 rounded-lg border bg-card p-6 text-center">
           <p className="text-sm text-muted-foreground">
-            El usuario aceptó. Pedile que instale el agente si aún no lo hizo.
+            El usuario aceptó. Pedile que instale el agente si aún no lo hizo. Cuando lo tengas listo, abrí MeshCentral y marcá la sesión como en curso.
           </p>
-          {meshcentralUrl && (
-            <a
-              href={meshcentralUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm hover:bg-accent"
+          <div className="flex flex-wrap items-center justify-center gap-3">
+            {meshcentralUrl && (
+              <a
+                href={meshcentralUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm hover:bg-accent"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Abrir MeshCentral
+              </a>
+            )}
+            <button
+              onClick={() => void startAsViewer()}
+              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
             >
-              <ExternalLink className="h-4 w-4" />
-              Abrir MeshCentral
-            </a>
-          )}
+              Marcar sesión en curso
+            </button>
+          </div>
+          <p className="text-xs text-muted-foreground">
+            Por ahora la asociación entre esta sesión y el dispositivo dentro de MeshCentral sigue siendo manual.
+          </p>
         </div>
       )}
 
@@ -263,6 +267,9 @@ export default function RemoteSessionPage() {
               Configurá VITE_MESHCENTRAL_URL para acceder al panel de control remoto.
             </p>
           )}
+          <p className="text-xs text-muted-foreground">
+            Control Issue coordina la sesión, pero la conexión remota real ocurre dentro de MeshCentral.
+          </p>
         </div>
       )}
 
