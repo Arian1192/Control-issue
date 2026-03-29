@@ -10,13 +10,73 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Trigger Coolify deployment
+        env:
+          PRIMARY_WEBHOOK_URL: ${{ secrets.COOLIFY_WEBHOOK_URL }}
+          PRIMARY_TOKEN: ${{ secrets.COOLIFY_TOKEN }}
+          FALLBACK_MANUAL_WEBHOOK_URL: ${{ secrets.COOLIFY_MANUAL_WEBHOOK_URL }}
+          FALLBACK_MANUAL_WEBHOOK_SECRET: ${{ secrets.COOLIFY_MANUAL_WEBHOOK_SECRET }}
         run: |
-          if ! curl --silent --fail --show-error \
-            --request GET \
-            --header "Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}" \
-            "${{ secrets.COOLIFY_WEBHOOK_URL }}"; then
-            echo "Primary Coolify trigger failed, retrying webhook without Authorization header..."
+          set -euo pipefail
+
+          trigger_primary() {
             curl --silent --fail --show-error \
               --request GET \
-              "${{ secrets.COOLIFY_WEBHOOK_URL }}"
+              --header "Authorization: Bearer ${PRIMARY_TOKEN}" \
+              "${PRIMARY_WEBHOOK_URL}"
+          }
+
+          trigger_manual_fallback() {
+            local manual_url="${FALLBACK_MANUAL_WEBHOOK_URL:-http://coolify.ariancoro.com/webhooks/source/github/events/manual}"
+            local payload
+            local signature
+            local response
+            local body
+            local code
+
+            payload=$(jq -nc \
+              --arg ref "${GITHUB_REF}" \
+              --arg full_name "${GITHUB_REPOSITORY}" \
+              --arg after "${GITHUB_SHA}" \
+              '{
+                ref: $ref,
+                repository: { full_name: $full_name },
+                commits: [{ added: [], removed: [], modified: [] }],
+                after: $after
+              }')
+
+            signature=$(printf '%s' "${payload}" | openssl dgst -sha256 -hmac "${FALLBACK_MANUAL_WEBHOOK_SECRET:-}" | awk '{print $2}')
+
+            response=$(curl --silent --show-error \
+              --write-out "\n%{http_code}" \
+              --request POST \
+              --header "Content-Type: application/json" \
+              --header "X-GitHub-Event: push" \
+              --header "X-Hub-Signature-256: sha256=${signature}" \
+              --data "${payload}" \
+              "${manual_url}")
+
+            body=$(printf '%s' "${response}" | sed '$d')
+            code=$(printf '%s' "${response}" | tail -n1)
+
+            echo "${body}"
+
+            if [ "${code}" -ge 400 ]; then
+              echo "Manual webhook fallback failed with HTTP ${code}."
+              return 1
+            fi
+
+            if echo "${body}" | grep -qi "Nothing to do"; then
+              echo "Manual webhook fallback did not match any deployable application."
+              return 1
+            fi
+
+            if echo "${body}" | grep -q '"status":"failed"'; then
+              echo "Manual webhook fallback returned failed application status."
+              return 1
+            fi
+          }
+
+          if ! trigger_primary; then
+            echo "Primary Coolify trigger failed, retrying with manual webhook fallback..."
+            trigger_manual_fallback
           fi
