@@ -32,7 +32,8 @@ Esta guía explica cómo registrar equipos y usar el flujo de asistencia remota 
    - **Key** = `VITE_RUSTDESK_KEY`
    - **Relay Server** = `VITE_RUSTDESK_RELAY_SERVER` (si está definido)
 5. Usuario copia su **ID de RustDesk** (y contraseña si aplica) en el formulario de la sesión.
-6. Técnico recibe esos datos en tiempo real y abre su cliente RustDesk / RustDesk web.
+6. Técnico recibe esos datos en tiempo real y abre su cliente RustDesk local.
+   - El cliente web es opcional y se usa solo si `VITE_RUSTDESK_WEB_CLIENT_ENABLED=true`.
 7. Técnico pulsa **Marcar sesión en curso** cuando inicia la conexión.
 8. Cualquier parte puede **Finalizar sesión** desde la app.
 
@@ -76,6 +77,7 @@ Sin esos permisos, no hay control remoto completo.
 VITE_RUSTDESK_ID_SERVER=rd.tudominio.com
 VITE_RUSTDESK_RELAY_SERVER=rd.tudominio.com:21117
 VITE_RUSTDESK_KEY=<contenido-id_ed25519.pub>
+VITE_RUSTDESK_WEB_CLIENT_ENABLED=false
 VITE_RUSTDESK_WEB_CLIENT_URL=https://rd.tudominio.com
 VITE_RUSTDESK_WEB_CLIENT_TEMPLATE=
 VITE_RUSTDESK_DOWNLOAD_WINDOWS_URL=

@@ -449,6 +449,18 @@ export default function RemoteSessionPage() {
 
           {session.rustdesk_id ? (
             <div className="space-y-3 rounded-md border bg-muted/30 p-4 text-sm">
+              {rustdesk.nativeSessionSummary && (
+                <div className="flex justify-end">
+                  <button
+                    onClick={() => void copyToClipboard('datos completos de RustDesk', rustdesk.nativeSessionSummary)}
+                    className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-background"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    Copiar datos completos
+                  </button>
+                </div>
+              )}
+
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p>
                   ID remoto: <strong>{session.rustdesk_id}</strong>
@@ -546,9 +558,18 @@ export default function RemoteSessionPage() {
               Abrir RustDesk web
             </a>
           ) : (
-            <p className="text-sm text-muted-foreground">
-              Abrí tu cliente RustDesk local y conectate usando el ID del usuario.
-            </p>
+            <div className="space-y-2 text-sm text-muted-foreground">
+              <p>Abrí tu cliente RustDesk local y conectate usando el ID del usuario.</p>
+              {session.rustdesk_id && (
+                <button
+                  onClick={() => void copyToClipboard('datos completos de RustDesk', rustdesk.nativeSessionSummary)}
+                  className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-background"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                  Copiar datos de conexión
+                </button>
+              )}
+            </div>
           )}
           <p className="text-xs text-muted-foreground">
             Control Issue coordina la sesión y RustDesk ejecuta la conexión remota.

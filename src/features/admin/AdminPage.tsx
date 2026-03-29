@@ -6,6 +6,8 @@ import { cn } from '@/lib/utils'
 import UserManagementPage from './UserManagementPage'
 
 const RUSTDESK_WEB_CLIENT_URL = import.meta.env.VITE_RUSTDESK_WEB_CLIENT_URL as string | undefined
+const RUSTDESK_WEB_CLIENT_ENABLED =
+  (import.meta.env.VITE_RUSTDESK_WEB_CLIENT_ENABLED as string | undefined) === 'true'
 
 type RemoteSession = Database['public']['Tables']['remote_sessions']['Row']
 
@@ -60,7 +62,7 @@ export default function AdminPage() {
         <div className="overflow-hidden rounded-lg border">
           <div className="flex items-center justify-between border-b bg-muted/40 px-4 py-3">
             <span className="text-sm font-medium">Sesiones finalizadas</span>
-            {RUSTDESK_WEB_CLIENT_URL && (
+            {RUSTDESK_WEB_CLIENT_ENABLED && RUSTDESK_WEB_CLIENT_URL && (
               <a
                 href={RUSTDESK_WEB_CLIENT_URL}
                 target="_blank"

@@ -416,6 +416,25 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      create_or_get_open_remote_session: {
+        Args: { p_issue_id: string | null; p_target_device_id: string }
+        Returns: {
+          accepted_at: string | null
+          connection_phase: string
+          ended_at: string | null
+          failure_reason: string | null
+          id: string
+          initiated_by: string
+          issue_id: string | null
+          rustdesk_id: string | null
+          rustdesk_password: string | null
+          rustdesk_platform: string | null
+          rustdesk_ready_at: string | null
+          started_at: string | null
+          status: SessionStatus
+          target_device_id: string
+        }
+      }
       current_role: { Args: never; Returns: string }
     }
     Enums: {

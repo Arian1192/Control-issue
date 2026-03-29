@@ -26,8 +26,8 @@ Un técnico o admin SHALL poder solicitar una sesión de asistencia remota a un 
 El sistema SHALL impedir más de una sesión abierta por dispositivo (`pendiente`, `aceptada`, `activa`).
 
 #### Scenario: Colisión por doble click o concurrencia
-- **WHEN** dos inserciones compiten sobre el mismo `target_device_id`
-- **THEN** la base de datos rechaza el duplicado por `remote_sessions_one_open_per_device_idx` y la app redirige a la sesión ya existente
+- **WHEN** dos solicitudes compiten sobre el mismo `target_device_id`
+- **THEN** la app usa `create_or_get_open_remote_session(...)` para resolverlo de forma atómica y devolver la sesión abierta existente o crear una nueva
 
 ### Requirement: Aceptar o rechazar sesión
 El propietario del dispositivo SHALL poder aceptar o rechazar la solicitud.

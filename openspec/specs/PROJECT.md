@@ -77,6 +77,7 @@ Control-issue/
       004_activity_log.sql         ← Tabla activity_log, triggers y RLS
       011_device_invites_fk_set_null.sql ← FK device_invites ON DELETE SET NULL
       012_remote_sessions_rustdesk_pivot.sql ← Lifecycle remoto + metadatos RustDesk + índice de sesión única
+      013_remote_sessions_atomic_start.sql ← RPC atómica para crear/recuperar sesión abierta por dispositivo
   openspec/
     specs/           ← PROJECT.md, AGENTS.md, specs por capacidad
     changes/
@@ -86,14 +87,14 @@ Control-issue/
 ## Configuración para nuevo entorno
 
 1. Crear proyecto en [Supabase](https://supabase.com)
-2. Ejecutar las migraciones en el SQL Editor en orden (001 → 012)
+2. Ejecutar las migraciones en el SQL Editor en orden (001 → 013)
 3. Activar Realtime para las tablas: `issues`, `issue_comments`, `remote_sessions`, `devices`, `activity_log`
 4. Copiar `.env.example` a `.env.local` y rellenar:
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
    - `VITE_RUSTDESK_ID_SERVER`
    - `VITE_RUSTDESK_KEY`
-   - *(Opcional)* `VITE_RUSTDESK_RELAY_SERVER`, `VITE_RUSTDESK_WEB_CLIENT_URL`, `VITE_RUSTDESK_WEB_CLIENT_TEMPLATE`, enlaces de descarga por OS
+   - *(Opcional)* `VITE_RUSTDESK_RELAY_SERVER`, `VITE_RUSTDESK_WEB_CLIENT_ENABLED`, `VITE_RUSTDESK_WEB_CLIENT_URL`, `VITE_RUSTDESK_WEB_CLIENT_TEMPLATE`, enlaces de descarga por OS
 5. Desplegar la Edge Function:
    ```bash
    npx supabase functions deploy admin-create-user --project-ref <project-ref> --no-verify-jwt

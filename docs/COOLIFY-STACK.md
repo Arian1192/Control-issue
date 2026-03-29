@@ -18,6 +18,7 @@ VITE_SUPABASE_ANON_KEY=
 VITE_RUSTDESK_ID_SERVER=
 VITE_RUSTDESK_RELAY_SERVER=
 VITE_RUSTDESK_KEY=
+VITE_RUSTDESK_WEB_CLIENT_ENABLED=false
 VITE_RUSTDESK_WEB_CLIENT_URL=
 VITE_RUSTDESK_WEB_CLIENT_TEMPLATE=
 VITE_RUSTDESK_DOWNLOAD_WINDOWS_URL=
@@ -47,6 +48,9 @@ CLOUDFLARE_TUNNEL_TOKEN=
    - `21119/tcp` (opcional, web client)
 5. Cloudflare Tunnel: exponer solo la app web (`app.tudominio.com -> http://app:80`).
 6. Para RustDesk, crear DNS directo (sin proxy) apuntando a la IP pública del VPS.
+
+> Importante: Cloudflare Tunnel está pensado para HTTP(S) público y TCP privado vía WARP.
+> Para RustDesk self-host (21115-21119), usá DNS directo a la IP del host.
 
 ## Clave RustDesk (importante)
 

@@ -19,6 +19,7 @@ function getEnv(name: string) {
 const RUSTDESK_ID_SERVER = getEnv('VITE_RUSTDESK_ID_SERVER')
 const RUSTDESK_RELAY_SERVER = getEnv('VITE_RUSTDESK_RELAY_SERVER')
 const RUSTDESK_KEY = getEnv('VITE_RUSTDESK_KEY')
+const RUSTDESK_WEB_CLIENT_ENABLED = getEnv('VITE_RUSTDESK_WEB_CLIENT_ENABLED') === 'true'
 const RUSTDESK_WEB_CLIENT_URL = getEnv('VITE_RUSTDESK_WEB_CLIENT_URL')
 const RUSTDESK_WEB_CLIENT_TEMPLATE = getEnv('VITE_RUSTDESK_WEB_CLIENT_TEMPLATE')
 const RUSTDESK_DOWNLOAD_WINDOWS_URL = getEnv('VITE_RUSTDESK_DOWNLOAD_WINDOWS_URL')
@@ -29,6 +30,7 @@ const RUSTDESK_DOWNLOAD_LINUX_URL = getEnv('VITE_RUSTDESK_DOWNLOAD_LINUX_URL')
 const OPEN_STATUSES: SessionStatus[] = ['pendiente', 'aceptada', 'activa']
 
 function buildWebClientSessionUrl(rustdeskId?: string | null, rustdeskPassword?: string | null) {
+  if (!RUSTDESK_WEB_CLIENT_ENABLED) return ''
   if (!rustdeskId) return ''
 
   if (RUSTDESK_WEB_CLIENT_TEMPLATE) {
@@ -40,6 +42,29 @@ function buildWebClientSessionUrl(rustdeskId?: string | null, rustdeskPassword?:
   }
 
   return RUSTDESK_WEB_CLIENT_URL ?? ''
+}
+
+function buildNativeConnectionSummary(rustdeskId?: string | null, rustdeskPassword?: string | null) {
+  if (!rustdeskId) return ''
+
+  const lines = [`ID remoto: ${rustdeskId}`]
+  if (rustdeskPassword?.trim()) {
+    lines.push(`Contraseña: ${rustdeskPassword.trim()}`)
+  }
+
+  if (RUSTDESK_ID_SERVER) {
+    lines.push(`ID Server: ${RUSTDESK_ID_SERVER}`)
+  }
+
+  if (RUSTDESK_RELAY_SERVER) {
+    lines.push(`Relay Server: ${RUSTDESK_RELAY_SERVER}`)
+  }
+
+  if (RUSTDESK_KEY) {
+    lines.push(`Key: ${RUSTDESK_KEY}`)
+  }
+
+  return lines.join('\n')
 }
 
 export function useRemoteSession(sessionId: string | null, userId: string | null) {
@@ -195,7 +220,8 @@ export function useRemoteSession(sessionId: string | null, userId: string | null
       idServer: RUSTDESK_ID_SERVER ?? '',
       relayServer: RUSTDESK_RELAY_SERVER ?? '',
       key: RUSTDESK_KEY ?? '',
-      webClientUrl: RUSTDESK_WEB_CLIENT_URL ?? '',
+      webClientEnabled: RUSTDESK_WEB_CLIENT_ENABLED,
+      webClientUrl: RUSTDESK_WEB_CLIENT_ENABLED ? (RUSTDESK_WEB_CLIENT_URL ?? '') : '',
       webClientTemplate: RUSTDESK_WEB_CLIENT_TEMPLATE ?? '',
       downloads: {
         windows: RUSTDESK_DOWNLOAD_WINDOWS_URL ?? '',
@@ -204,6 +230,7 @@ export function useRemoteSession(sessionId: string | null, userId: string | null
         linux: RUSTDESK_DOWNLOAD_LINUX_URL ?? '',
       },
       sessionWebClientUrl: buildWebClientSessionUrl(session?.rustdesk_id, session?.rustdesk_password),
+      nativeSessionSummary: buildNativeConnectionSummary(session?.rustdesk_id, session?.rustdesk_password),
     },
     startAsSharer,
     publishRustDeskConnection,
