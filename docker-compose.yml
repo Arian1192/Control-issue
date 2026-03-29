@@ -13,17 +13,25 @@ services:
       - internal
 
   coturn:
-    build:
-      context: .
-      dockerfile: docker/coturn/Dockerfile
+    image: coturn/coturn:latest
     restart: unless-stopped
     network_mode: host
-    environment:
-      - TURN_SECRET=${TURN_SECRET}
-      - TURN_REALM=${TURN_REALM}
-      - TURN_EXTERNAL_IP=${TURN_EXTERNAL_IP}
-      - TURN_MIN_PORT=${TURN_MIN_PORT:-56000}
-      - TURN_MAX_PORT=${TURN_MAX_PORT:-56100}
+    command: >-
+      -n
+      --use-auth-secret
+      --static-auth-secret=${TURN_SECRET}
+      --realm=${TURN_REALM}
+      --external-ip=${TURN_EXTERNAL_IP}
+      --listening-port=3478
+      --min-port=56000
+      --max-port=56100
+      --no-multicast-peers
+      --no-loopback-peers
+      --denied-peer-ip=10.0.0.0-10.255.255.255
+      --denied-peer-ip=172.16.0.0-172.31.255.255
+      --denied-peer-ip=192.168.0.0-192.168.255.255
+      --log-file=stdout
+      --simple-log
 
   cloudflared:
     image: cloudflare/cloudflared:latest
