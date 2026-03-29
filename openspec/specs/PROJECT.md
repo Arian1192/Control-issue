@@ -12,7 +12,7 @@ Los departamentos de IT necesitan un canal estructurado para que los empleados r
 
 1. **Gestión de incidencias** — Los usuarios reportan problemas con título, descripción y prioridad. Los técnicos gestionan el ciclo de vida (abierto → en-progreso → resuelto → cerrado), añaden comentarios en tiempo real y adjuntan archivos (logs, capturas). Los admins asignan incidencias a técnicos o a sí mismos. Desde el detalle de una incidencia se puede iniciar directamente una sesión de asistencia remota.
 
-2. **Asistencia remota** — Los técnicos y admins inician sesiones de compartición de pantalla con el ordenador del usuario usando WebRTC con Supabase Realtime como canal de señalización. El usuario recibe una notificación en la app y acepta o rechaza la sesión. El lifecycle completo es: `pendiente → aceptada → activa → finalizada/rechazada/fallida/cancelada`. Funciona en red local; para redes externas se requiere configurar un servidor TURN.
+2. **Asistencia remota** — Los técnicos y admins inician sesiones remotas desde incidencias o dispositivos. La app coordina el flujo (`pendiente → aceptada → activa → finalizada/rechazada/fallida/cancelada`) y realiza handoff a RustDesk self-hosted: el usuario comparte su ID y credenciales temporales, y el técnico se conecta usando RustDesk (cliente local o web).
 
 3. **Invitación de dispositivos** — El admin-it genera un link de invitación (`/invite/:token`) para que un usuario registre su equipo sin configuración manual. El link expira en 24 horas, es de un solo uso, y opcionalmente lleva asociada una sesión remota pendiente. El dispositivo se registra automáticamente con nombre inferido del user-agent.
 
@@ -32,7 +32,7 @@ Los departamentos de IT necesitan un canal estructurado para que los empleados r
 | Estilos | Tailwind CSS v3 + ShadCN/UI (Radix UI) |
 | Backend | Supabase (PostgreSQL, Auth, Realtime, Storage, Edge Functions) |
 | Routing | react-router-dom v7 |
-| Acceso remoto | WebRTC (`getDisplayMedia`) + Supabase Realtime (señalización) |
+| Acceso remoto | RustDesk OSS self-host (`hbbs` + `hbbr`) + coordinación de sesión en Supabase Realtime |
 | Funciones privilegiadas | Supabase Edge Functions (Deno) |
 
 ## Roles
@@ -75,13 +75,8 @@ Control-issue/
       002_storage.sql              ← Storage bucket para adjuntos
       003_user_management.sql      ← RLS y Edge Function para gestión de usuarios
       004_activity_log.sql         ← Tabla activity_log, triggers y RLS
-      005_remote_sessions_realtime.sql  ← Publicación Realtime para remote_sessions y devices
-      006_remote_session_lifecycle.sql  ← Lifecycle ampliado: accepted_at, connection_phase, failure_reason
-      007_devices_created_at.sql   ← Índice created_at en devices
-      008_device_invites.sql       ← Tabla device_invites con RLS
-      009_devices_delete_policy.sql ← Política RLS para eliminar dispositivos propios
-      010_device_cascade_delete.sql ← FK remote_sessions ON DELETE CASCADE
       011_device_invites_fk_set_null.sql ← FK device_invites ON DELETE SET NULL
+      012_remote_sessions_rustdesk_pivot.sql ← Lifecycle remoto + metadatos RustDesk + índice de sesión única
   openspec/
     specs/           ← PROJECT.md, AGENTS.md, specs por capacidad
     changes/
@@ -91,12 +86,14 @@ Control-issue/
 ## Configuración para nuevo entorno
 
 1. Crear proyecto en [Supabase](https://supabase.com)
-2. Ejecutar las migraciones en el SQL Editor en orden (001 → 011)
+2. Ejecutar las migraciones en el SQL Editor en orden (001 → 012)
 3. Activar Realtime para las tablas: `issues`, `issue_comments`, `remote_sessions`, `devices`, `activity_log`
 4. Copiar `.env.example` a `.env.local` y rellenar:
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
-   - *(Opcional)* `VITE_TURN_URL`, `VITE_TURN_USERNAME`, `VITE_TURN_CREDENTIAL` para asistencia remota fuera de LAN
+   - `VITE_RUSTDESK_ID_SERVER`
+   - `VITE_RUSTDESK_KEY`
+   - *(Opcional)* `VITE_RUSTDESK_RELAY_SERVER`, `VITE_RUSTDESK_WEB_CLIENT_URL`, `VITE_RUSTDESK_WEB_CLIENT_TEMPLATE`, enlaces de descarga por OS
 5. Desplegar la Edge Function:
    ```bash
    npx supabase functions deploy admin-create-user --project-ref <project-ref> --no-verify-jwt
@@ -107,5 +104,5 @@ Control-issue/
 
 ## Limitaciones conocidas
 
-- **Asistencia remota fuera de LAN**: WebRTC funciona correctamente en red local. Para redes externas (VPN, internet) se necesita un servidor TURN configurado. Sin él, la conexión WebRTC fallará cuando STUN no logre atravesar el NAT de ambas partes.
+- **Dependencia de infraestructura RustDesk**: si `hbbs`/`hbbr` no están alcanzables o faltan puertos (21115/21116/21117), la sesión no puede concretarse aunque la app web esté operativa.
 - **Notificaciones fuera de la app**: No hay notificaciones push ni por email. El usuario debe tener la app abierta para recibir solicitudes de sesión.

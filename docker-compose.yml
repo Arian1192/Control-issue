@@ -5,41 +5,46 @@ services:
       args:
         VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
         VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
-        VITE_MESHCENTRAL_URL: ${VITE_MESHCENTRAL_URL:-}
-        VITE_MESHCENTRAL_AGENT_INVITE_URL: ${VITE_MESHCENTRAL_AGENT_INVITE_URL:-}
-        VITE_MESHCENTRAL_MESH_ID: ${VITE_MESHCENTRAL_MESH_ID:-}
-        VITE_MESHCENTRAL_AGENT_DOWNLOAD_URL: ${VITE_MESHCENTRAL_AGENT_DOWNLOAD_URL:-}
-        VITE_MESHCENTRAL_AGENT_WINDOWS_URL: ${VITE_MESHCENTRAL_AGENT_WINDOWS_URL:-}
-        VITE_MESHCENTRAL_AGENT_MAC_INTEL_URL: ${VITE_MESHCENTRAL_AGENT_MAC_INTEL_URL:-}
-        VITE_MESHCENTRAL_AGENT_MAC_ARM_URL: ${VITE_MESHCENTRAL_AGENT_MAC_ARM_URL:-}
+        VITE_RUSTDESK_ID_SERVER: ${VITE_RUSTDESK_ID_SERVER:-}
+        VITE_RUSTDESK_RELAY_SERVER: ${VITE_RUSTDESK_RELAY_SERVER:-}
+        VITE_RUSTDESK_KEY: ${VITE_RUSTDESK_KEY:-}
+        VITE_RUSTDESK_WEB_CLIENT_URL: ${VITE_RUSTDESK_WEB_CLIENT_URL:-}
+        VITE_RUSTDESK_WEB_CLIENT_TEMPLATE: ${VITE_RUSTDESK_WEB_CLIENT_TEMPLATE:-}
+        VITE_RUSTDESK_DOWNLOAD_WINDOWS_URL: ${VITE_RUSTDESK_DOWNLOAD_WINDOWS_URL:-}
+        VITE_RUSTDESK_DOWNLOAD_MAC_INTEL_URL: ${VITE_RUSTDESK_DOWNLOAD_MAC_INTEL_URL:-}
+        VITE_RUSTDESK_DOWNLOAD_MAC_ARM_URL: ${VITE_RUSTDESK_DOWNLOAD_MAC_ARM_URL:-}
+        VITE_RUSTDESK_DOWNLOAD_LINUX_URL: ${VITE_RUSTDESK_DOWNLOAD_LINUX_URL:-}
     restart: unless-stopped
     expose:
       - '80'
     networks:
       - internal
 
-  meshcentral:
-    image: ghcr.io/ylianst/meshcentral:latest
-    restart: unless-stopped
-    volumes:
-      - meshcentral-data-v5:/opt/meshcentral/meshcentral-data
-      - meshcentral-files-v5:/opt/meshcentral/meshcentral-files
-      - meshcentral-web-v5:/opt/meshcentral/meshcentral-web
-      - meshcentral-backups-v5:/opt/meshcentral/meshcentral-backups
+  rustdesk-hbbs:
+    image: rustdesk/rustdesk-server:latest
+    command: hbbs -r ${RUSTDESK_RELAY_HOST:-rd.tudominio.com:21117}
     environment:
-      - NODE_ENV=production
-      - DYNAMIC_CONFIG=true
-      - HOSTNAME=${MESHCENTRAL_HOSTNAME:-mesh.ariancoro.com}
-      - PORT=443
-      - REDIR_PORT=80
-      - ALLOW_NEW_ACCOUNTS=true
-      - IFRAME=true
-      - WEBRTC=false
-      - REVERSE_PROXY=${MESHCENTRAL_HOSTNAME:-mesh.ariancoro.com}
-      - REVERSE_PROXY_TLS_PORT=443
-      - TRUSTED_PROXY=true
-    expose:
-      - '443'
+      - ALWAYS_USE_RELAY=${RUSTDESK_ALWAYS_USE_RELAY:-N}
+    volumes:
+      - rustdesk-data-v1:/root
+    restart: unless-stopped
+    ports:
+      - '21115:21115'
+      - '21116:21116'
+      - '21116:21116/udp'
+      - '21118:21118'
+    networks:
+      - internal
+
+  rustdesk-hbbr:
+    image: rustdesk/rustdesk-server:latest
+    command: hbbr
+    volumes:
+      - rustdesk-data-v1:/root
+    restart: unless-stopped
+    ports:
+      - '21117:21117'
+      - '21119:21119'
     networks:
       - internal
 
@@ -51,7 +56,6 @@ services:
       - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
     depends_on:
       - app
-      - meshcentral
     networks:
       - internal
 
@@ -60,7 +64,4 @@ networks:
     driver: bridge
 
 volumes:
-  meshcentral-data-v5:
-  meshcentral-files-v5:
-  meshcentral-web-v5:
-  meshcentral-backups-v5:
+  rustdesk-data-v1:

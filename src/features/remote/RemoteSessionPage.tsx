@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { ExternalLink, XCircle } from 'lucide-react'
+import { Check, Copy, ExternalLink, XCircle } from 'lucide-react'
 import { useAuth } from '@/features/auth/useAuth'
 import { useRemoteSession } from './useRemoteSession'
 import { SessionChat } from './SessionChat'
@@ -10,6 +10,8 @@ import type { SessionStatus } from '@/types'
 
 const OPEN_STATUSES: SessionStatus[] = ['pendiente', 'aceptada', 'activa']
 const TERMINAL_STATUSES: SessionStatus[] = ['rechazada', 'fallida', 'finalizada', 'cancelada']
+
+type AgentOptionKey = 'windows' | 'macIntel' | 'macArm' | 'linux'
 
 function getStatusBadgeClasses(status: SessionStatus) {
   switch (status) {
@@ -31,7 +33,57 @@ function getStatusBadgeClasses(status: SessionStatus) {
 }
 
 function getStatusLabel(status: SessionStatus) {
-  return status === 'aceptada' ? 'aceptada / conectando' : status
+  return status === 'aceptada' ? 'aceptada / preparando conexión' : status
+}
+
+function detectPreferredAgentKey(): AgentOptionKey | null {
+  if (typeof window === 'undefined') return null
+
+  const navigatorWithUAData = navigator as Navigator & {
+    userAgentData?: { platform?: string; architecture?: string }
+  }
+
+  const platform = (navigatorWithUAData.userAgentData?.platform ?? navigator.platform ?? '').toLowerCase()
+  const architecture = (navigatorWithUAData.userAgentData?.architecture ?? '').toLowerCase()
+  const userAgent = navigator.userAgent.toLowerCase()
+
+  if (platform.includes('win') || userAgent.includes('windows')) return 'windows'
+
+  if (platform.includes('mac') || userAgent.includes('mac os x')) {
+    if (architecture.includes('arm') || userAgent.includes('arm64') || userAgent.includes('aarch64')) {
+      return 'macArm'
+    }
+
+    if (
+      architecture.includes('x86') ||
+      architecture.includes('intel') ||
+      userAgent.includes('x86_64') ||
+      userAgent.includes('intel')
+    ) {
+      return 'macIntel'
+    }
+
+    return 'macArm'
+  }
+
+  if (platform.includes('linux') || userAgent.includes('linux')) return 'linux'
+
+  return null
+}
+
+function platformLabelFromAgentKey(key: AgentOptionKey | null) {
+  switch (key) {
+    case 'windows':
+      return 'Windows'
+    case 'macIntel':
+      return 'macOS Intel'
+    case 'macArm':
+      return 'macOS Apple Silicon'
+    case 'linux':
+      return 'Linux'
+    default:
+      return ''
+  }
 }
 
 export default function RemoteSessionPage() {
@@ -39,14 +91,18 @@ export default function RemoteSessionPage() {
   const { profile } = useAuth()
   const navigate = useNavigate()
   const [deviceOwnerId, setDeviceOwnerId] = useState<string | null>(null)
+  const [savingRustDesk, setSavingRustDesk] = useState(false)
+  const [copyFeedback, setCopyFeedback] = useState<string | null>(null)
+  const [rustDeskIdInput, setRustDeskIdInput] = useState('')
+  const [rustDeskPasswordInput, setRustDeskPasswordInput] = useState('')
+  const [rustDeskPlatform, setRustDeskPlatform] = useState('')
 
   const {
     session,
     error,
-    meshcentralUrl,
-    meshcentralAgentInviteUrl,
-    meshcentralAgentDownloads,
+    rustdesk,
     startAsSharer,
+    publishRustDeskConnection,
     startAsViewer,
     rejectSession,
     cancelSession,
@@ -74,57 +130,61 @@ export default function RemoteSessionPage() {
   const isAccepted = sessionStatus === 'aceptada'
   const isActive = sessionStatus === 'activa'
   const canViewerCancel = isViewer && (isPending || isAccepted)
-  const preferredAgentKey = useMemo(() => {
-    if (typeof window === 'undefined') return null
-    const navigatorWithUAData = navigator as Navigator & {
-      userAgentData?: { platform?: string; architecture?: string }
-    }
-    const platform =
-      (navigatorWithUAData.userAgentData?.platform ?? navigator.platform ?? '').toLowerCase()
-    const architecture = (navigatorWithUAData.userAgentData?.architecture ?? '').toLowerCase()
-    const userAgent = navigator.userAgent.toLowerCase()
 
-    if (platform.includes('win') || userAgent.includes('windows')) return 'windows'
-    if (platform.includes('mac') || userAgent.includes('mac os x')) {
-      if (
-        architecture.includes('arm') ||
-        userAgent.includes('arm64') ||
-        userAgent.includes('aarch64')
-      ) {
-        return 'macArm'
-      }
-      if (
-        architecture.includes('x86') ||
-        architecture.includes('intel') ||
-        userAgent.includes('x86_64') ||
-        userAgent.includes('intel')
-      ) {
-        return 'macIntel'
-      }
+  const preferredAgentKey = useMemo(() => detectPreferredAgentKey(), [])
+  const preferredPlatformLabel = useMemo(() => platformLabelFromAgentKey(preferredAgentKey), [preferredAgentKey])
+
+  useEffect(() => {
+    if (!session || !isAccepted || !isSharer) return
+
+    setRustDeskIdInput(session.rustdesk_id ?? '')
+    setRustDeskPasswordInput(session.rustdesk_password ?? '')
+
+    if (session.rustdesk_platform) {
+      setRustDeskPlatform(session.rustdesk_platform)
+      return
     }
 
-    return null
-  }, [])
+    if (preferredPlatformLabel) {
+      setRustDeskPlatform(preferredPlatformLabel)
+    }
+  }, [
+    isAccepted,
+    isSharer,
+    preferredPlatformLabel,
+    session,
+    session?.rustdesk_id,
+    session?.rustdesk_password,
+    session?.rustdesk_platform,
+  ])
+
   const agentOptions = [
     {
       key: 'windows',
       label: 'Windows',
       description: 'PC con Windows 64-bit',
-      href: meshcentralAgentDownloads.windows,
+      href: rustdesk.downloads.windows,
     },
     {
       key: 'macIntel',
       label: 'Mac Intel',
       description: 'Mac con procesador Intel',
-      href: meshcentralAgentDownloads.macIntel,
+      href: rustdesk.downloads.macIntel,
     },
     {
       key: 'macArm',
       label: 'Mac Apple Silicon',
       description: 'Mac M1/M2/M3/M4',
-      href: meshcentralAgentDownloads.macArm,
+      href: rustdesk.downloads.macArm,
+    },
+    {
+      key: 'linux',
+      label: 'Linux',
+      description: 'Ubuntu / Debian / Fedora y compatibles',
+      href: rustdesk.downloads.linux,
     },
   ] as const
+
   const availableAgentOptions = agentOptions.filter((option) => !!option.href)
 
   async function handleAccept() {
@@ -143,6 +203,32 @@ export default function RemoteSessionPage() {
 
   async function handleEndSession() {
     await endSession('finalizada')
+  }
+
+  async function handlePublishRustDesk() {
+    setSavingRustDesk(true)
+    const success = await publishRustDeskConnection({
+      rustdeskId: rustDeskIdInput,
+      rustdeskPassword: rustDeskPasswordInput,
+      platform: rustDeskPlatform || null,
+    })
+
+    if (success) {
+      setCopyFeedback('Datos de conexión enviados al técnico.')
+    }
+
+    setSavingRustDesk(false)
+  }
+
+  async function copyToClipboard(label: string, value?: string | null) {
+    if (!value) return
+
+    try {
+      await navigator.clipboard.writeText(value)
+      setCopyFeedback(`${label} copiado.`)
+    } catch {
+      setCopyFeedback(`No se pudo copiar ${label}.`)
+    }
   }
 
   if (!session) {
@@ -174,15 +260,22 @@ export default function RemoteSessionPage() {
         </span>
       </div>
 
-      {!meshcentralUrl && (
+      {(!rustdesk.idServer || !rustdesk.key) && (
         <div className="rounded-md border border-yellow-200 bg-yellow-50 px-4 py-3 text-xs text-yellow-900">
-          MeshCentral URL no configurada. Configurá VITE_MESHCENTRAL_URL en el entorno.
+          Configuración incompleta: definí <strong>VITE_RUSTDESK_ID_SERVER</strong> y{' '}
+          <strong>VITE_RUSTDESK_KEY</strong>.
         </div>
       )}
 
       {error && (
         <div className="rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive">
           {error}
+        </div>
+      )}
+
+      {copyFeedback && (
+        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+          {copyFeedback}
         </div>
       )}
 
@@ -217,31 +310,14 @@ export default function RemoteSessionPage() {
       {isSharer && isAccepted && (
         <div className="space-y-6 rounded-lg border bg-card p-6">
           <div className="text-center">
-            <h2 className="text-base font-semibold">Instalá el agente de asistencia remota</h2>
+            <h2 className="text-base font-semibold">Instalá y abrí RustDesk</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Para continuar la asistencia, descargá e instalá el agente remoto. El técnico va a seguir desde MeshCentral en otra pestaña.
+              Descargá RustDesk, conectalo a este servidor y compartí tu ID para que el técnico te asista.
             </p>
           </div>
 
-          {meshcentralAgentInviteUrl && (
-            <div className="text-center">
-              <a
-                href={meshcentralAgentInviteUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm hover:bg-accent"
-              >
-                <ExternalLink className="h-4 w-4" />
-                Abrir instalador guiado de MeshCentral
-              </a>
-              <p className="mt-2 text-xs text-muted-foreground">
-                Recomendado: este enlace suele incluir el dispositivo preasignado.
-              </p>
-            </div>
-          )}
-
           {availableAgentOptions.length > 0 ? (
-            <div className="grid gap-2 sm:grid-cols-3">
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
               {availableAgentOptions.map((option) => {
                 const isRecommended = preferredAgentKey === option.key
                 return (
@@ -273,19 +349,77 @@ export default function RemoteSessionPage() {
             </p>
           )}
 
-          <ol className="mx-auto max-w-xs space-y-1 text-sm text-muted-foreground">
-            <li>1. Descargá el instalador según tu sistema operativo</li>
-            <li>2. Ejecutalo y seguí los pasos</li>
-            <li>3. Permití captura de pantalla/accesibilidad si macOS lo pide</li>
-            <li>4. Avisale al técnico cuando el agente quede listo</li>
-          </ol>
+          <div className="rounded-lg border bg-muted/30 p-4 text-sm">
+            <p className="font-medium">Configuración del servidor RustDesk</p>
+            <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+              <p>
+                ID Server: <strong className="text-foreground">{rustdesk.idServer || '—'}</strong>
+              </p>
+              <p>
+                Relay Server:{' '}
+                <strong className="text-foreground">{rustdesk.relayServer || '(auto)'}</strong>
+              </p>
+              <p>
+                Key: <strong className="break-all text-foreground">{rustdesk.key || '—'}</strong>
+              </p>
+            </div>
+          </div>
+
+          <div className="grid gap-3 rounded-lg border p-4 md:grid-cols-2">
+            <label className="space-y-1 text-left text-sm">
+              <span className="text-xs text-muted-foreground">Tu ID de RustDesk</span>
+              <input
+                value={rustDeskIdInput}
+                onChange={(event) => setRustDeskIdInput(event.target.value)}
+                placeholder="Ej: 123 456 789"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              />
+            </label>
+
+            <label className="space-y-1 text-left text-sm">
+              <span className="text-xs text-muted-foreground">Contraseña temporal (opcional)</span>
+              <input
+                value={rustDeskPasswordInput}
+                onChange={(event) => setRustDeskPasswordInput(event.target.value)}
+                placeholder="Si RustDesk te muestra una"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              />
+            </label>
+
+            <label className="space-y-1 text-left text-sm md:col-span-2">
+              <span className="text-xs text-muted-foreground">Sistema operativo</span>
+              <input
+                value={rustDeskPlatform}
+                onChange={(event) => setRustDeskPlatform(event.target.value)}
+                placeholder="Windows / macOS / Linux"
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+              />
+            </label>
+
+            <div className="md:col-span-2">
+              <button
+                onClick={handlePublishRustDesk}
+                disabled={savingRustDesk || !rustDeskIdInput.trim()}
+                className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {savingRustDesk ? 'Guardando…' : 'Enviar datos al técnico'}
+              </button>
+            </div>
+          </div>
+
+          {session.rustdesk_ready_at && (
+            <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+              <Check className="h-4 w-4" />
+              Listo: el técnico ya puede iniciar la conexión con tu equipo.
+            </div>
+          )}
         </div>
       )}
 
       {isSharer && isActive && (
         <div className="rounded-lg border bg-card p-6 text-center">
           <p className="text-sm text-muted-foreground">
-            Sesión en curso. El técnico continúa la asistencia desde MeshCentral.
+            Sesión en curso. El técnico está conectado por RustDesk.
           </p>
         </div>
       )}
@@ -308,54 +442,116 @@ export default function RemoteSessionPage() {
       )}
 
       {isViewer && isAccepted && (
-        <div className="space-y-4 rounded-lg border bg-card p-6 text-center">
-          <p className="text-sm text-muted-foreground">
-            El usuario aceptó. Pedile que instale el agente si aún no lo hizo. Cuando lo tengas listo, abrí MeshCentral y marcá la sesión como en curso.
+        <div className="space-y-4 rounded-lg border bg-card p-6">
+          <p className="text-sm text-muted-foreground text-center">
+            El usuario aceptó la sesión. Esperá a que comparta su ID de RustDesk o pedile que lo cargue desde este panel.
           </p>
+
+          {session.rustdesk_id ? (
+            <div className="space-y-3 rounded-md border bg-muted/30 p-4 text-sm">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p>
+                  ID remoto: <strong>{session.rustdesk_id}</strong>
+                </p>
+                <button
+                  onClick={() => void copyToClipboard('ID de RustDesk', session.rustdesk_id)}
+                  className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-background"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                  Copiar ID
+                </button>
+              </div>
+
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p>
+                  Contraseña: <strong>{session.rustdesk_password || 'no informada'}</strong>
+                </p>
+                {session.rustdesk_password && (
+                  <button
+                    onClick={() => void copyToClipboard('contraseña de RustDesk', session.rustdesk_password)}
+                    className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-background"
+                  >
+                    <Copy className="h-3.5 w-3.5" />
+                    Copiar contraseña
+                  </button>
+                )}
+              </div>
+
+              {session.rustdesk_platform && (
+                <p className="text-xs text-muted-foreground">Plataforma del usuario: {session.rustdesk_platform}</p>
+              )}
+            </div>
+          ) : (
+            <p className="rounded-md border border-dashed px-4 py-3 text-center text-sm text-muted-foreground">
+              Todavía no hay ID de RustDesk cargado.
+            </p>
+          )}
+
           <div className="flex flex-wrap items-center justify-center gap-3">
-            {meshcentralUrl && (
+            {rustdesk.sessionWebClientUrl && (
               <a
-                href={meshcentralUrl}
+                href={rustdesk.sessionWebClientUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm hover:bg-accent"
               >
                 <ExternalLink className="h-4 w-4" />
-                Abrir MeshCentral
+                Abrir cliente web RustDesk
               </a>
             )}
+
+            {rustdesk.webClientUrl && !rustdesk.sessionWebClientUrl && (
+              <a
+                href={rustdesk.webClientUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm hover:bg-accent"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Abrir RustDesk web
+              </a>
+            )}
+
             <button
               onClick={() => void startAsViewer()}
-              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+              disabled={!session.rustdesk_id}
+              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               Marcar sesión en curso
             </button>
           </div>
-          <p className="text-xs text-muted-foreground">
-            Por ahora la asociación entre esta sesión y el dispositivo dentro de MeshCentral sigue siendo manual.
-          </p>
         </div>
       )}
 
       {isViewer && isActive && (
         <div className="space-y-4 rounded-lg border bg-card p-6 text-center">
-          {meshcentralUrl ? (
+          {rustdesk.sessionWebClientUrl ? (
             <a
-              href={meshcentralUrl}
+              href={rustdesk.sessionWebClientUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="inline-flex items-center gap-2 rounded-md bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
             >
               <ExternalLink className="h-4 w-4" />
-              Abrir MeshCentral
+              Abrir conexión RustDesk
+            </a>
+          ) : rustdesk.webClientUrl ? (
+            <a
+              href={rustdesk.webClientUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-md bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+            >
+              <ExternalLink className="h-4 w-4" />
+              Abrir RustDesk web
             </a>
           ) : (
             <p className="text-sm text-muted-foreground">
-              Configurá VITE_MESHCENTRAL_URL para acceder al panel de control remoto.
+              Abrí tu cliente RustDesk local y conectate usando el ID del usuario.
             </p>
           )}
           <p className="text-xs text-muted-foreground">
-            Control Issue coordina la sesión, pero la conexión remota real ocurre dentro de MeshCentral.
+            Control Issue coordina la sesión y RustDesk ejecuta la conexión remota.
           </p>
         </div>
       )}

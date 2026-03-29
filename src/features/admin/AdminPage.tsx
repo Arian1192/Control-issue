@@ -5,7 +5,7 @@ import type { Database } from '@/types'
 import { cn } from '@/lib/utils'
 import UserManagementPage from './UserManagementPage'
 
-const MESHCENTRAL_URL = import.meta.env.VITE_MESHCENTRAL_URL as string | undefined
+const RUSTDESK_WEB_CLIENT_URL = import.meta.env.VITE_RUSTDESK_WEB_CLIENT_URL as string | undefined
 
 type RemoteSession = Database['public']['Tables']['remote_sessions']['Row']
 
@@ -60,15 +60,15 @@ export default function AdminPage() {
         <div className="overflow-hidden rounded-lg border">
           <div className="flex items-center justify-between border-b bg-muted/40 px-4 py-3">
             <span className="text-sm font-medium">Sesiones finalizadas</span>
-            {MESHCENTRAL_URL && (
+            {RUSTDESK_WEB_CLIENT_URL && (
               <a
-                href={MESHCENTRAL_URL}
+                href={RUSTDESK_WEB_CLIENT_URL}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-1.5 rounded-md border px-3 py-1 text-xs font-medium hover:bg-accent"
               >
                 <ExternalLink className="h-3.5 w-3.5" />
-                Abrir MeshCentral
+                Abrir RustDesk web
               </a>
             )}
           </div>

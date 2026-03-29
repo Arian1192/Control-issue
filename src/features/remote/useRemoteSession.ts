@@ -5,42 +5,39 @@ import type { Database, SessionStatus } from '@/types'
 type RemoteSession = Database['public']['Tables']['remote_sessions']['Row']
 type RemoteSessionUpdate = Database['public']['Tables']['remote_sessions']['Update']
 
+type PublishRustDeskPayload = {
+  rustdeskId: string
+  rustdeskPassword?: string | null
+  platform?: string | null
+}
+
 function getEnv(name: string) {
   const value = (import.meta.env[name] as string | undefined)?.trim()
   return value ? value : undefined
 }
 
-const MESHCENTRAL_URL = getEnv('VITE_MESHCENTRAL_URL')
-const MESHCENTRAL_AGENT_DOWNLOAD_URL = getEnv('VITE_MESHCENTRAL_AGENT_DOWNLOAD_URL')
-const MESHCENTRAL_AGENT_WINDOWS_URL = getEnv('VITE_MESHCENTRAL_AGENT_WINDOWS_URL')
-const MESHCENTRAL_AGENT_MAC_INTEL_URL = getEnv('VITE_MESHCENTRAL_AGENT_MAC_INTEL_URL')
-const MESHCENTRAL_AGENT_MAC_ARM_URL = getEnv('VITE_MESHCENTRAL_AGENT_MAC_ARM_URL')
-const MESHCENTRAL_AGENT_INVITE_URL = getEnv('VITE_MESHCENTRAL_AGENT_INVITE_URL')
-const MESHCENTRAL_MESH_ID = getEnv('VITE_MESHCENTRAL_MESH_ID')
+const RUSTDESK_ID_SERVER = getEnv('VITE_RUSTDESK_ID_SERVER')
+const RUSTDESK_RELAY_SERVER = getEnv('VITE_RUSTDESK_RELAY_SERVER')
+const RUSTDESK_KEY = getEnv('VITE_RUSTDESK_KEY')
+const RUSTDESK_WEB_CLIENT_URL = getEnv('VITE_RUSTDESK_WEB_CLIENT_URL')
+const RUSTDESK_WEB_CLIENT_TEMPLATE = getEnv('VITE_RUSTDESK_WEB_CLIENT_TEMPLATE')
+const RUSTDESK_DOWNLOAD_WINDOWS_URL = getEnv('VITE_RUSTDESK_DOWNLOAD_WINDOWS_URL')
+const RUSTDESK_DOWNLOAD_MAC_INTEL_URL = getEnv('VITE_RUSTDESK_DOWNLOAD_MAC_INTEL_URL')
+const RUSTDESK_DOWNLOAD_MAC_ARM_URL = getEnv('VITE_RUSTDESK_DOWNLOAD_MAC_ARM_URL')
+const RUSTDESK_DOWNLOAD_LINUX_URL = getEnv('VITE_RUSTDESK_DOWNLOAD_LINUX_URL')
+
 const OPEN_STATUSES: SessionStatus[] = ['pendiente', 'aceptada', 'activa']
 
-function toAbsoluteUrl(baseUrl: string | undefined, path: string) {
-  if (!baseUrl) return ''
-  try {
-    return new URL(path, baseUrl).toString()
-  } catch {
-    return ''
-  }
-}
+function buildWebClientSessionUrl(rustdeskId?: string | null, rustdeskPassword?: string | null) {
+  if (!rustdeskId) return ''
 
-function buildProvisionedAgentUrl(path: string, agentId: number) {
-  if (!MESHCENTRAL_MESH_ID) return ''
-  const base = toAbsoluteUrl(MESHCENTRAL_URL, path)
-  if (!base) return ''
-
-  try {
-    const url = new URL(base)
-    url.searchParams.set('id', String(agentId))
-    url.searchParams.set('meshid', MESHCENTRAL_MESH_ID)
-    return url.toString()
-  } catch {
-    return ''
+  if (RUSTDESK_WEB_CLIENT_TEMPLATE) {
+    return RUSTDESK_WEB_CLIENT_TEMPLATE
+      .replaceAll('{id}', encodeURIComponent(rustdeskId))
+      .replaceAll('{password}', encodeURIComponent(rustdeskPassword ?? ''))
   }
+
+  return RUSTDESK_WEB_CLIENT_URL ?? ''
 }
 
 export function useRemoteSession(sessionId: string | null, userId: string | null) {
@@ -55,7 +52,8 @@ export function useRemoteSession(sessionId: string | null, userId: string | null
 
   const updateSession = useCallback(
     async (update: RemoteSessionUpdate) => {
-      if (!sessionId) return
+      if (!sessionId) return false
+
       const { error: updateError } = await supabase
         .from('remote_sessions')
         .update(update)
@@ -114,15 +112,42 @@ export function useRemoteSession(sessionId: string | null, userId: string | null
     await updateSession({
       status: 'aceptada',
       accepted_at: sessionRef.current?.accepted_at ?? new Date().toISOString(),
-      connection_phase: 'signaling',
+      connection_phase: 'awaiting-agent',
       failure_reason: null,
       ended_at: null,
+      rustdesk_id: null,
+      rustdesk_password: null,
+      rustdesk_ready_at: null,
+      rustdesk_platform: null,
+    })
+  }
+
+  async function publishRustDeskConnection(payload: PublishRustDeskPayload) {
+    const rustdeskId = payload.rustdeskId.trim()
+    if (!rustdeskId) {
+      setError('Ingresá el ID de RustDesk antes de continuar.')
+      return false
+    }
+
+    return updateSession({
+      connection_phase: 'agent-ready',
+      failure_reason: null,
+      rustdesk_id: rustdeskId,
+      rustdesk_password: payload.rustdeskPassword?.trim() || null,
+      rustdesk_ready_at: new Date().toISOString(),
+      rustdesk_platform: payload.platform ?? null,
     })
   }
 
   async function startAsViewer() {
     if (!sessionId || !userId) return
     if (session?.status !== 'aceptada') return
+
+    if (!session?.rustdesk_id) {
+      setError('Todavía no recibiste el ID de RustDesk del usuario.')
+      return
+    }
+
     setError(null)
     await updateSession({
       status: 'activa',
@@ -137,6 +162,7 @@ export function useRemoteSession(sessionId: string | null, userId: string | null
       status: 'rechazada',
       connection_phase: 'idle',
       failure_reason: null,
+      rustdesk_password: null,
       ended_at: new Date().toISOString(),
     })
   }
@@ -146,6 +172,7 @@ export function useRemoteSession(sessionId: string | null, userId: string | null
       status: 'cancelada',
       connection_phase: 'closing',
       failure_reason: null,
+      rustdesk_password: null,
       ended_at: new Date().toISOString(),
     })
   }
@@ -154,6 +181,7 @@ export function useRemoteSession(sessionId: string | null, userId: string | null
     await updateSession({
       status: finalStatus,
       connection_phase: 'closing',
+      rustdesk_password: null,
       ended_at: new Date().toISOString(),
     })
   }
@@ -161,23 +189,22 @@ export function useRemoteSession(sessionId: string | null, userId: string | null
   return {
     session,
     error,
-    meshcentralUrl: MESHCENTRAL_URL ?? '',
-    meshcentralAgentInviteUrl: MESHCENTRAL_AGENT_INVITE_URL ?? '',
-    meshcentralAgentDownloads: {
-      windows:
-        MESHCENTRAL_AGENT_WINDOWS_URL ??
-        MESHCENTRAL_AGENT_DOWNLOAD_URL ??
-        buildProvisionedAgentUrl('/meshagents', 4),
-      macIntel:
-        MESHCENTRAL_AGENT_MAC_INTEL_URL ??
-        buildProvisionedAgentUrl('/meshosxagent', 16),
-      macArm:
-        MESHCENTRAL_AGENT_MAC_ARM_URL ??
-        buildProvisionedAgentUrl('/meshosxagent', 29),
+    rustdesk: {
+      idServer: RUSTDESK_ID_SERVER ?? '',
+      relayServer: RUSTDESK_RELAY_SERVER ?? '',
+      key: RUSTDESK_KEY ?? '',
+      webClientUrl: RUSTDESK_WEB_CLIENT_URL ?? '',
+      webClientTemplate: RUSTDESK_WEB_CLIENT_TEMPLATE ?? '',
+      downloads: {
+        windows: RUSTDESK_DOWNLOAD_WINDOWS_URL ?? '',
+        macIntel: RUSTDESK_DOWNLOAD_MAC_INTEL_URL ?? '',
+        macArm: RUSTDESK_DOWNLOAD_MAC_ARM_URL ?? '',
+        linux: RUSTDESK_DOWNLOAD_LINUX_URL ?? '',
+      },
+      sessionWebClientUrl: buildWebClientSessionUrl(session?.rustdesk_id, session?.rustdesk_password),
     },
-    meshcentralAgentDownloadUrl:
-      MESHCENTRAL_AGENT_DOWNLOAD_URL ?? buildProvisionedAgentUrl('/meshagents', 4),
     startAsSharer,
+    publishRustDeskConnection,
     startAsViewer,
     rejectSession,
     cancelSession,

@@ -347,6 +347,10 @@ export type Database = {
           id: string
           initiated_by: string
           issue_id: string | null
+          rustdesk_id: string | null
+          rustdesk_password: string | null
+          rustdesk_platform: string | null
+          rustdesk_ready_at: string | null
           started_at: string | null
           status: SessionStatus
           target_device_id: string
@@ -359,6 +363,10 @@ export type Database = {
           id?: string
           initiated_by: string
           issue_id?: string | null
+          rustdesk_id?: string | null
+          rustdesk_password?: string | null
+          rustdesk_platform?: string | null
+          rustdesk_ready_at?: string | null
           started_at?: string | null
           status?: SessionStatus
           target_device_id: string
@@ -371,6 +379,10 @@ export type Database = {
           id?: string
           initiated_by?: string
           issue_id?: string | null
+          rustdesk_id?: string | null
+          rustdesk_password?: string | null
+          rustdesk_platform?: string | null
+          rustdesk_ready_at?: string | null
           started_at?: string | null
           status?: SessionStatus
           target_device_id?: string

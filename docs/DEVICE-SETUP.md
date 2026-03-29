@@ -1,148 +1,85 @@
-# Guía de setup de dispositivos — Control Issue
+# Guía de setup de dispositivos — Control Issue + RustDesk
 
-Esta guía explica cómo registrar equipos en el sistema y cómo probar la asistencia remota con dos ordenadores (o dos navegadores en el mismo PC).
-
----
-
-## ¿Qué es un "dispositivo"?
-
-Un dispositivo es el registro de un ordenador en Control Issue. Al registrar un equipo, el sistema puede:
-
-- Mostrar si está online u offline (heartbeat cada 30 segundos)
-- Detectar y guardar su IP local automáticamente
-- Recibir solicitudes de asistencia remota de técnicos o administradores
-
-Cada dispositivo pertenece a un usuario y puede estar vinculado a incidencias.
+Esta guía explica cómo registrar equipos y usar el flujo de asistencia remota con RustDesk.
 
 ---
 
-## Requisitos previos
+## 1) Registro del dispositivo en Control Issue
 
-- La app debe correr en **HTTPS o `localhost`**. `getDisplayMedia()` (compartir pantalla) está bloqueado en HTTP con IP (ej. `http://192.168.x.x`).
-- Navegador moderno con soporte WebRTC: Chrome 80+, Firefox 75+, Edge 80+, Safari 14+.
-- Para compartir pantalla: el navegador debe tener permisos del sistema operativo (macOS → Preferencias del Sistema → Privacidad → Grabación de pantalla).
+1. Iniciá sesión como `user`.
+2. Ir a **Dispositivos** → **Mis dispositivos**.
+3. Cargar nombre del equipo y guardar.
+4. Esperar estado **En línea**.
 
----
-
-## 1. Registrar un dispositivo
-
-1. Iniciá sesión con tu cuenta de **usuario** (rol `user`).
-2. En el menú lateral, pulsá **Dispositivos**.
-3. En la sección **"Mis dispositivos"**, escribí un nombre descriptivo en el campo de texto (ej. `PC-Oficina-01`, `Laptop-Dev`, `Mi-Mac`).
-4. Pulsá **Añadir** o presioná Enter.
-5. El dispositivo aparece en el listado con estado **Offline** inicialmente.
-6. En unos segundos (el heartbeat se ejecuta al cargar la app), el estado cambia a **En línea** y se detecta la IP local automáticamente.
-
-> **Tip:** Podés renombrar un dispositivo haciendo doble click sobre su nombre o usando el icono de lápiz. Podés eliminarlo con el icono de papelera (siempre que no tenga una sesión remota activa).
+> Esto solo registra disponibilidad en la app. No instala RustDesk todavía.
 
 ---
 
-## 2. Probar la asistencia remota con 2 ordenadores
+## 2) Flujo real de asistencia remota
 
-### Roles necesarios
+### Roles
 
-| Equipo                | Rol                       | Acción                                                                   |
-| --------------------- | ------------------------- | ------------------------------------------------------------------------ |
-| Equipo A (el usuario) | `user`                    | Registra su dispositivo, recibe y acepta la solicitud, comparte pantalla |
-| Equipo B (el técnico) | `admin-it` o `technician` | Inicia la sesión remota, ve la pantalla                                  |
+- **Usuario final (sharer)**: acepta solicitud, instala/abre RustDesk y comparte su ID.
+- **Técnico/Admin (viewer)**: inicia sesión remota y se conecta al ID del usuario.
 
-### Pasos
+### Paso a paso
 
-**En Equipo A (usuario):**
-
-1. Abre la app e iniciá sesión como `user`.
-2. Ve a **Dispositivos** → **Mis dispositivos** → registrá el equipo con un nombre.
-3. Verificá que el estado sea **En línea** (verde).
-
-**En Equipo B (técnico):**
-
-4. Abre la app e iniciá sesión como `admin-it` o `technician`.
-5. Ve a **Dispositivos** → sección **"Dispositivos de usuarios"**.
-6. Deberías ver el dispositivo registrado en el Equipo A con estado **En línea**.
-7. Pulsá **Iniciar asistencia remota**.
-
-**De vuelta en Equipo A:**
-
-8. Aparece un banner amarillo en la parte superior: _"Un técnico solicita acceso remoto a [nombre-dispositivo]"_.
-9. Pulsá **Abrir y aceptar**.
-10. El navegador pide permisos para compartir pantalla — elegí qué compartir (pantalla completa, ventana o pestaña).
-
-**En Equipo B:**
-
-11. Una vez aceptada la sesión, el stream de pantalla aparece en la vista de sesión remota.
+1. Técnico entra a la incidencia y pulsa **Iniciar asistencia remota**.
+2. Usuario acepta la solicitud en `/remote/:sessionId`.
+3. Usuario descarga RustDesk desde los enlaces sugeridos (Windows/macOS/Linux).
+4. Usuario abre RustDesk y configura (si hace falta):
+   - **ID Server** = `VITE_RUSTDESK_ID_SERVER`
+   - **Key** = `VITE_RUSTDESK_KEY`
+   - **Relay Server** = `VITE_RUSTDESK_RELAY_SERVER` (si está definido)
+5. Usuario copia su **ID de RustDesk** (y contraseña si aplica) en el formulario de la sesión.
+6. Técnico recibe esos datos en tiempo real y abre su cliente RustDesk / RustDesk web.
+7. Técnico pulsa **Marcar sesión en curso** cuando inicia la conexión.
+8. Cualquier parte puede **Finalizar sesión** desde la app.
 
 ---
 
-## 3. Probar con 2 navegadores en el mismo PC
+## 3) Notas para macOS (Intel / Apple Silicon)
 
-Esta es la forma más rápida de probar sin necesitar 2 máquinas físicas.
+Al primer uso macOS puede pedir permisos:
 
-### Setup
+- Grabación de pantalla
+- Accesibilidad
 
-- **Navegador A** (ej. Chrome): inicia sesión como `user`.
-- **Navegador B** (ej. Firefox, o Chrome en modo Incógnito): inicia sesión como `admin-it`.
-
-> Chrome y Firefox mantienen sesiones de autenticación completamente separadas. Chrome normal + Chrome Incógnito también funcionan.
-
-### Flujo
-
-1. En **Navegador A**: registrá un dispositivo y verificá que está online.
-2. En **Navegador B**: ve a Dispositivos → Dispositivos de usuarios → **Iniciar asistencia remota** en el dispositivo de A.
-3. En **Navegador A**: aceptá la solicitud en el banner → elegí qué compartir (podés compartir la pestaña del Navegador A).
-4. En **Navegador B**: verás el stream de pantalla.
-
-> **WebRTC en misma máquina**: los peers se conectan vía loopback (`127.0.0.1`) o IP LAN local. Funciona sin TURN server en este caso.
+Sin esos permisos, no hay control remoto completo.
 
 ---
 
-## 4. Troubleshooting
+## 4) Troubleshooting rápido
 
-### El dispositivo aparece como Offline
+### No aparece el dispositivo en RustDesk server
 
-- Recargá la página — el heartbeat se ejecuta al montar `AppLayout`.
-- Verificá que tenés la sesión activa (no expiró).
-- Comprobá la consola del navegador por errores de Supabase Realtime.
+- Verificar que `hbbs` y `hbbr` estén arriba.
+- Verificar puertos abiertos en host (21115/21116/21117 mínimo).
+- Verificar que el cliente tenga el `ID Server` y `Key` correctos.
 
-### El botón "Iniciar asistencia remota" aparece deshabilitado
+### El técnico no puede conectar desde otra red
 
-- El dispositivo debe estar **En línea** para poder iniciar sesión.
-- Verificá que el usuario con el dispositivo tenga la app abierta.
+- Confirmar `21116/udp` abierto.
+- Confirmar DNS directo (sin proxy) para dominio RustDesk.
+- Probar con `RUSTDESK_ALWAYS_USE_RELAY=Y` si hay NAT compleja.
 
-### El navegador no pide compartir pantalla
+### En la app no llega la actualización de sesión
 
-- La app debe correr en HTTPS o `localhost`. En HTTP puro (sin localhost), `getDisplayMedia` está bloqueado por el navegador.
-- En **macOS**: verificá Preferencias del Sistema → Privacidad y seguridad → Grabación de pantalla → habilitá el navegador.
-- En **Windows**: no requiere permisos adicionales de sistema.
-
-### La conexión WebRTC no se establece (fallo en 30 segundos)
-
-- En redes distintas sin TURN: configura el stack con `VITE_TURN_URL`, `TURN_SECRET`, `TURN_REALM` y `TURN_EXTERNAL_IP`.
-- La app ya no usa `VITE_TURN_USERNAME` ni `VITE_TURN_CREDENTIAL`: las credenciales se generan dinámicamente desde la Edge Function `get-turn-credentials`.
-  ```
-  VITE_TURN_URL=turns:turn.tudominio.com:5349
-  TURN_SECRET=<secret-compartido-con-supabase>
-  TURN_REALM=turn.tudominio.com
-  TURN_EXTERNAL_IP=<ip-publica-del-vps>
-  ```
-- Verificá que los puertos UDP (3478, 49152-65535) no estén bloqueados por el firewall.
-- En el mismo PC o misma LAN, TURN no es necesario.
-
-### Error "No podés eliminar el dispositivo porque tiene una sesión en curso"
-
-- Finalizá o rechazá la sesión activa desde la página de sesión remota antes de eliminar el dispositivo.
+- Revisar conexión Realtime de Supabase en ambos navegadores.
+- Verificar que ambos usuarios tengan sesión autenticada activa.
 
 ---
 
-## 5. Variables de entorno
+## 5) Variables relevantes para frontend
 
 ```env
-# Supabase (requerido)
-VITE_SUPABASE_URL=https://tu-proyecto.supabase.co
-VITE_SUPABASE_ANON_KEY=tu-anon-key
-
-# TURN server (opcional — solo necesario para conexiones fuera de LAN)
-VITE_TURN_URL=turns:turn.tudominio.com:5349
-TURN_SECRET=<secret-compartido-con-supabase>
-TURN_REALM=turn.tudominio.com
-TURN_EXTERNAL_IP=<ip-publica-del-vps>
+VITE_RUSTDESK_ID_SERVER=rd.tudominio.com
+VITE_RUSTDESK_RELAY_SERVER=rd.tudominio.com:21117
+VITE_RUSTDESK_KEY=<contenido-id_ed25519.pub>
+VITE_RUSTDESK_WEB_CLIENT_URL=https://rd.tudominio.com
+VITE_RUSTDESK_WEB_CLIENT_TEMPLATE=
+VITE_RUSTDESK_DOWNLOAD_WINDOWS_URL=
+VITE_RUSTDESK_DOWNLOAD_MAC_INTEL_URL=
+VITE_RUSTDESK_DOWNLOAD_MAC_ARM_URL=
+VITE_RUSTDESK_DOWNLOAD_LINUX_URL=
 ```
