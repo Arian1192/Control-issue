@@ -10,7 +10,7 @@ export default function RemoteSessionPage() {
   const { profile } = useAuth()
   const videoRef = useRef<HTMLVideoElement>(null)
 
-  const { session, remoteStream, connectionState, error, startAsInitiator, endSession } =
+  const { session, remoteStream, connectionState, error, startAsSharer: startAsInitiator, endSession } =
     useRemoteSession(sessionId ?? null, profile?.id ?? null)
 
   // Render remote stream in <video> element (task 6.8)
@@ -72,7 +72,7 @@ export default function RemoteSessionPage() {
         )}
         {session?.status === 'activa' && (
           <button
-            onClick={endSession}
+            onClick={() => void endSession()}
             className="rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground"
           >
             Finalizar sesión

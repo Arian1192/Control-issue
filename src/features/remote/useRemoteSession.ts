@@ -154,7 +154,7 @@ export function useRemoteSession(sessionId: string | null, userId: string | null
         }
 
         if (nextState === 'failed' || nextState === 'disconnected') {
-          if (!isTerminalStatus(sessionRef.current?.status)) {
+          if (!isTerminalStatus(sessionRef.current?.status as SessionStatus | undefined)) {
             void markFailure('La conexión remota se interrumpió antes de estabilizarse.')
           }
           return
@@ -180,7 +180,7 @@ export function useRemoteSession(sessionId: string | null, userId: string | null
       }
 
       timeoutRef.current = setTimeout(() => {
-        if (pc.connectionState !== 'connected' && !isTerminalStatus(sessionRef.current?.status)) {
+        if (pc.connectionState !== 'connected' && !isTerminalStatus(sessionRef.current?.status as SessionStatus | undefined)) {
           void markFailure('La conexión remota agotó el tiempo de espera (30s).')
         }
       }, CONNECTION_TIMEOUT_MS)
@@ -285,7 +285,7 @@ export function useRemoteSession(sessionId: string | null, userId: string | null
   }, [sessionId])
 
   useEffect(() => {
-    if (!session || !isTerminalStatus(session.status)) return
+    if (!session || !isTerminalStatus(session.status as SessionStatus)) return
     disposePeerConnection(true)
   }, [disposePeerConnection, session?.id, session?.status])
 
@@ -379,6 +379,6 @@ export function useRemoteSession(sessionId: string | null, userId: string | null
     rejectSession,
     cancelSession,
     endSession,
-    isSessionOpen: OPEN_STATUSES.includes(session?.status ?? 'fallida'),
+    isSessionOpen: OPEN_STATUSES.includes((session?.status ?? 'fallida') as SessionStatus),
   }
 }

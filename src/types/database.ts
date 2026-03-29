@@ -513,3 +513,31 @@ export const Constants = {
     Enums: {},
   },
 } as const
+
+export type Role = 'admin-it' | 'technician' | 'user'
+
+export type IssueStatus = 'abierto' | 'en-progreso' | 'resuelto' | 'cerrado'
+
+export type IssuePriority = 'baja' | 'media' | 'alta' | 'critica'
+
+export type SessionStatus =
+  | 'pendiente'
+  | 'aceptada'
+  | 'activa'
+  | 'rechazada'
+  | 'fallida'
+  | 'finalizada'
+  | 'cancelada'
+
+export type ActivityEventType =
+  | 'issue_created'
+  | 'status_changed'
+  | 'issue_assigned'
+  | 'comment_added'
+  | 'attachment_added'
+  | 'session_started'
+  | 'session_ended'
+  | 'session_rejected'
+  | 'user_created'
+  | 'user_deactivated'
+  | 'user_reactivated'

@@ -27,7 +27,7 @@ export function UserFormModal({ mode, user, onSuccess, onClose }: UserFormModalP
   const [name, setName] = useState(user?.name ?? '')
   const [email, setEmail] = useState(user?.email ?? '')
   const [password, setPassword] = useState('')
-  const [role, setRole] = useState<Role>(user?.role ?? 'user')
+  const [role, setRole] = useState<Role>((user?.role as Role | undefined) ?? 'user')
   const [isActive, setIsActive] = useState(user?.is_active ?? true)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
