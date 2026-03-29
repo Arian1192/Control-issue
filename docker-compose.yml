@@ -15,19 +15,16 @@ services:
       context: .
       dockerfile: docker/coturn/Dockerfile
     restart: unless-stopped
-    ports:
-      - '3478:3478/udp'
-      - '3478:3478/tcp'
-      - '5349:5349/tcp'
-      - '56000-56100:56000-56100/udp'
+    # TURN relay candidates must be published from the host network namespace.
+    # Docker bridge/NAT makes browsers see the container IP (for example 10.0.3.3)
+    # instead of the public relay address, which breaks WAN ICE checks.
+    network_mode: host
     environment:
       - TURN_SECRET=${TURN_SECRET}
       - TURN_REALM=${TURN_REALM}
       - TURN_EXTERNAL_IP=${TURN_EXTERNAL_IP}
       - TURN_MIN_PORT=${TURN_MIN_PORT:-56000}
       - TURN_MAX_PORT=${TURN_MAX_PORT:-56100}
-    networks:
-      - internal
 
   cloudflared:
     image: cloudflare/cloudflared:latest
