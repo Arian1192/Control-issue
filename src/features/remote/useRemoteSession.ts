@@ -13,12 +13,27 @@ interface SignalPayload {
   from: string
 }
 
+type DisplaySurfacePreference = 'include' | 'exclude'
+
+type BrowserDisplayMediaStreamOptions = DisplayMediaStreamOptions & {
+  preferCurrentTab?: boolean
+  selfBrowserSurface?: DisplaySurfacePreference
+  surfaceSwitching?: DisplaySurfacePreference
+}
+
 const TURN_URL = import.meta.env.VITE_TURN_URL
 const CONNECTION_TIMEOUT_MS = 30_000
 const OPEN_STATUSES: SessionStatus[] = ['pendiente', 'aceptada', 'activa']
 const TERMINAL_STATUSES: SessionStatus[] = ['rechazada', 'fallida', 'finalizada', 'cancelada']
 
 const STUN_ONLY: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }]
+const DISPLAY_MEDIA_OPTIONS: BrowserDisplayMediaStreamOptions = {
+  video: true,
+  audio: false,
+  preferCurrentTab: true,
+  selfBrowserSurface: 'exclude',
+  surfaceSwitching: 'include',
+}
 
 async function fetchIceServers(): Promise<RTCIceServer[]> {
   if (!TURN_URL) return STUN_ONLY
@@ -305,7 +320,7 @@ export function useRemoteSession(sessionId: string | null, userId: string | null
       // Fetch TURN credentials and display media in parallel to minimize latency
       const [iceServers, stream] = await Promise.all([
         fetchIceServers(),
-        navigator.mediaDevices.getDisplayMedia({ video: true, audio: false }),
+        navigator.mediaDevices.getDisplayMedia(DISPLAY_MEDIA_OPTIONS),
       ])
 
       const pc = createPeerConnection('sharer', iceServers)

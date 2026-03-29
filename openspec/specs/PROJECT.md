@@ -96,12 +96,16 @@ Control-issue/
 4. Copiar `.env.example` a `.env.local` y rellenar:
    - `VITE_SUPABASE_URL`
    - `VITE_SUPABASE_ANON_KEY`
-   - *(Opcional)* `VITE_TURN_URL`, `VITE_TURN_USERNAME`, `VITE_TURN_CREDENTIAL` para asistencia remota fuera de LAN
+   - *(Opcional)* `VITE_TURN_URL` para asistencia remota fuera de LAN (una o varias URLs TURN separadas por coma)
 5. Desplegar la Edge Function:
    ```bash
    npx supabase functions deploy admin-create-user --project-ref <project-ref> --no-verify-jwt
    ```
    > `--no-verify-jwt` es necesario porque los proyectos nuevos de Supabase usan JWTs con algoritmo ES256, que el gateway aún no valida. La función hace su propia verificación internamente.
+   ```bash
+   npx supabase functions deploy get-turn-credentials --project-ref <project-ref>
+   ```
+   > Para asistencia remota fuera de LAN también hay que cargar los secrets `TURN_SECRET` y `TURN_URL` en Supabase.
 6. `npm install && npm run dev`
 7. Crear el primer usuario admin-it directamente en Supabase Dashboard → Authentication → Users, luego actualizar su `role` a `admin-it` en la tabla `profiles`
 

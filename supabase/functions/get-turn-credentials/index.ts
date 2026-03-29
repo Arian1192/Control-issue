@@ -21,6 +21,13 @@ Deno.serve(async (req: Request) => {
     )
   }
 
+  const turnUrls = turnUrl
+    .split(/[\n,]/)
+    .map((value) => value.trim())
+    .filter(Boolean)
+
+  const rtcUrls = turnUrls.length === 1 ? turnUrls[0] : turnUrls
+
   // ── Validate JWT ───────────────────────────────────────────────────────────
   const authHeader = req.headers.get('Authorization')
   if (!authHeader) {
@@ -62,7 +69,7 @@ Deno.serve(async (req: Request) => {
   const credential = btoa(String.fromCharCode(...new Uint8Array(signature)))
 
   return new Response(
-    JSON.stringify({ urls: turnUrl, username, credential }),
+    JSON.stringify({ urls: rtcUrls, username, credential }),
     { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
   )
 })

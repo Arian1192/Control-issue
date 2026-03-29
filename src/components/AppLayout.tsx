@@ -333,7 +333,8 @@ export default function AppLayout() {
                       <strong>{device?.name ?? 'tu dispositivo'}</strong>.
                     </p>
                     <p className="text-xs text-yellow-800/80">
-                      Sesión {session.id.slice(0, 8)}…
+                      Sesión {session.id.slice(0, 8)}… Después vas a poder elegir qué pestaña,
+                      ventana o pantalla compartir.
                     </p>
                   </div>
                   <div className="flex gap-2">
@@ -341,7 +342,7 @@ export default function AppLayout() {
                       onClick={() => acceptSession(session.id)}
                       className="rounded-md bg-green-600 px-3 py-1 text-xs font-medium text-white hover:bg-green-700"
                     >
-                      Abrir y aceptar
+                      Abrir y elegir qué compartir
                     </button>
                     <button
                       onClick={() => rejectSession(session.id)}

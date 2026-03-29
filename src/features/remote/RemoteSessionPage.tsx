@@ -1,26 +1,78 @@
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useParams } from 'react-router-dom'
 import { useAuth } from '@/features/auth/useAuth'
 import { useRemoteSession } from './useRemoteSession'
 import { SessionChat } from './SessionChat'
+import { supabase } from '@/lib/supabaseClient'
 import { cn } from '@/lib/utils'
 
 export default function RemoteSessionPage() {
   const { sessionId } = useParams<{ sessionId: string }>()
   const { profile } = useAuth()
   const videoRef = useRef<HTMLVideoElement>(null)
+  const [targetDeviceOwnerId, setTargetDeviceOwnerId] = useState<string | null>(null)
+  const [targetDeviceName, setTargetDeviceName] = useState<string | null>(null)
 
-  const { session, remoteStream, connectionState, error, startAsSharer: startAsInitiator, endSession } =
-    useRemoteSession(sessionId ?? null, profile?.id ?? null)
+  const {
+    session,
+    remoteStream,
+    connectionState,
+    error,
+    startAsSharer,
+    startAsViewer,
+    endSession,
+    isSessionOpen,
+  } = useRemoteSession(sessionId ?? null, profile?.id ?? null)
 
-  // Render remote stream in <video> element (task 6.8)
   useEffect(() => {
     if (videoRef.current && remoteStream) {
       videoRef.current.srcObject = remoteStream
     }
   }, [remoteStream])
 
+  useEffect(() => {
+    const targetDeviceId = session?.target_device_id ?? null
+
+    if (!targetDeviceId) {
+      setTargetDeviceOwnerId(null)
+      setTargetDeviceName(null)
+      return
+    }
+
+    let ignore = false
+
+    async function loadTargetDevice() {
+      if (!targetDeviceId) return
+
+      const { data } = await supabase
+        .from('devices')
+        .select('owner_id, name')
+        .eq('id', targetDeviceId)
+        .single()
+
+      if (ignore) return
+
+      setTargetDeviceOwnerId(data?.owner_id ?? null)
+      setTargetDeviceName(data?.name ?? null)
+    }
+
+    void loadTargetDevice()
+
+    return () => {
+      ignore = true
+    }
+  }, [session?.target_device_id])
+
   const isInitiator = session?.initiated_by === profile?.id
+  const isDeviceOwner = Boolean(profile?.id && targetDeviceOwnerId && profile.id === targetDeviceOwnerId)
+  const canShareScreen = Boolean(
+    profile?.id && session && (targetDeviceOwnerId ? isDeviceOwner : profile.id !== session.initiated_by)
+  )
+
+  useEffect(() => {
+    if (!isInitiator || !isSessionOpen || connectionState !== 'idle') return
+    void startAsViewer()
+  }, [connectionState, isInitiator, isSessionOpen, startAsViewer])
 
   return (
     <div className="mx-auto max-w-4xl space-y-4">
@@ -44,7 +96,21 @@ export default function RemoteSessionPage() {
         <div className="rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive">{error}</div>
       )}
 
-      {/* Remote video stream */}
+      {session && (
+        <div className="rounded-lg border bg-card px-4 py-3 text-sm text-muted-foreground">
+          {canShareScreen ? (
+            <p>
+              Cuando empieces, tu navegador te va a dejar elegir qué pestaña, ventana o pantalla
+              compartir{targetDeviceName ? ` desde ${targetDeviceName}` : ''}.
+            </p>
+          ) : isInitiator ? (
+            <p>Esperando que la persona atendida elija qué compartir desde su equipo.</p>
+          ) : (
+            <p>Esperando información de la sesión remota…</p>
+          )}
+        </div>
+      )}
+
       <div className="overflow-hidden rounded-lg border bg-black">
         <video
           ref={videoRef}
@@ -62,15 +128,15 @@ export default function RemoteSessionPage() {
       </div>
 
       <div className="flex gap-2">
-        {isInitiator && session?.status === 'activa' && (
+        {canShareScreen && isSessionOpen && (
           <button
-            onClick={startAsInitiator}
+            onClick={() => void startAsSharer()}
             className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground"
           >
-            Compartir pantalla
+            Elegir pantalla, ventana o pestaña
           </button>
         )}
-        {session?.status === 'activa' && (
+        {isSessionOpen && (
           <button
             onClick={() => void endSession()}
             className="rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground"
