@@ -7,11 +7,6 @@ type RemoteSessionUpdate = Database['public']['Tables']['remote_sessions']['Upda
 
 const MESHCENTRAL_URL = import.meta.env.VITE_MESHCENTRAL_URL as string | undefined
 const OPEN_STATUSES: SessionStatus[] = ['pendiente', 'aceptada', 'activa']
-const TERMINAL_STATUSES: SessionStatus[] = ['rechazada', 'fallida', 'finalizada', 'cancelada']
-
-function isTerminalStatus(status?: SessionStatus | null): boolean {
-  return !!status && TERMINAL_STATUSES.includes(status)
-}
 
 export function useRemoteSession(sessionId: string | null, userId: string | null) {
   const [session, setSession] = useState<RemoteSession | null>(null)
