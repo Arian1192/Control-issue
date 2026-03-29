@@ -30,7 +30,6 @@ const STUN_ONLY: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }]
 const DISPLAY_MEDIA_OPTIONS: BrowserDisplayMediaStreamOptions = {
   video: true,
   audio: false,
-  preferCurrentTab: true,
   selfBrowserSurface: 'exclude',
   surfaceSwitching: 'include',
 }
