@@ -11,7 +11,12 @@ jobs:
     steps:
       - name: Trigger Coolify deployment
         run: |
-          curl --silent --fail --show-error \
+          if ! curl --silent --fail --show-error \
             --request GET \
             --header "Authorization: Bearer ${{ secrets.COOLIFY_TOKEN }}" \
-            "${{ secrets.COOLIFY_WEBHOOK_URL }}"
+            "${{ secrets.COOLIFY_WEBHOOK_URL }}"; then
+            echo "Primary Coolify trigger failed, retrying webhook without Authorization header..."
+            curl --silent --fail --show-error \
+              --request GET \
+              "${{ secrets.COOLIFY_WEBHOOK_URL }}"
+          fi
