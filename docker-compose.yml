@@ -35,7 +35,6 @@ services:
       - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
     depends_on:
       - app
-      - meshcentral
     networks:
       - internal
 
