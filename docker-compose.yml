@@ -17,7 +17,6 @@ services:
     restart: unless-stopped
     network_mode: host
     command: >-
-      -n
       --use-auth-secret
       --static-auth-secret=${TURN_SECRET}
       --realm=${TURN_REALM}
