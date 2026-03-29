@@ -22,7 +22,7 @@ services:
 
   rustdesk-hbbs:
     image: rustdesk/rustdesk-server:latest
-    command: hbbs -r ${RUSTDESK_RELAY_HOST:-rd.tudominio.com:21117}
+    command: hbbs -r ${RUSTDESK_RELAY_HOST:-rd.tudominio.com:21117} -k ${RUSTDESK_KEY}
     environment:
       - ALWAYS_USE_RELAY=${RUSTDESK_ALWAYS_USE_RELAY:-N}
     volumes:
@@ -38,7 +38,7 @@ services:
 
   rustdesk-hbbr:
     image: rustdesk/rustdesk-server:latest
-    command: hbbr
+    command: hbbr -k ${RUSTDESK_KEY}
     volumes:
       - rustdesk-data-v1:/root
     restart: unless-stopped

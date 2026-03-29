@@ -27,6 +27,7 @@ VITE_RUSTDESK_DOWNLOAD_LINUX_URL=
 
 RUSTDESK_HBBS_HOST=
 RUSTDESK_RELAY_HOST=
+RUSTDESK_KEY=
 RUSTDESK_ALWAYS_USE_RELAY=N
 
 CLOUDFLARE_TUNNEL_TOKEN=
@@ -47,17 +48,14 @@ CLOUDFLARE_TUNNEL_TOKEN=
 5. Cloudflare Tunnel: exponer solo la app web (`app.tudominio.com -> http://app:80`).
 6. Para RustDesk, crear DNS directo (sin proxy) apuntando a la IP pública del VPS.
 
-## Obtener la clave pública de RustDesk
+## Clave RustDesk (importante)
 
-Después del primer arranque, `hbbs` genera `id_ed25519.pub` dentro del volumen compartido.
+Definí una clave base64 en `RUSTDESK_KEY` y reutilizá ese mismo valor en `VITE_RUSTDESK_KEY`.
 
-Ejemplo (en el servidor):
+De esa forma:
 
-```bash
-docker exec -it <container-hbbs> cat /root/id_ed25519.pub
-```
-
-Ese valor va en `VITE_RUSTDESK_KEY` para que los clientes se configuren contra tu servidor.
+- `hbbs`/`hbbr` arrancan con una clave estable (`-k`),
+- los clientes pueden validar el servidor sin pasos manuales extra.
 
 ## Nota de arquitectura
 
