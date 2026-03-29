@@ -23,7 +23,6 @@ type BrowserDisplayMediaStreamOptions = DisplayMediaStreamOptions & {
 
 const TURN_URL = import.meta.env.VITE_TURN_URL
 const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
-const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 const CONNECTION_TIMEOUT_MS = 30_000
 const OPEN_STATUSES: SessionStatus[] = ['pendiente', 'aceptada', 'activa']
 const TERMINAL_STATUSES: SessionStatus[] = ['rechazada', 'fallida', 'finalizada', 'cancelada']
@@ -36,12 +35,35 @@ const DISPLAY_MEDIA_OPTIONS: BrowserDisplayMediaStreamOptions = {
   surfaceSwitching: 'include',
 }
 
+type TurnCredentialsPayload = {
+  urls?: string | string[]
+  username?: string
+  credential?: string
+  error?: string
+}
+
 function buildTurnAuthHeaders(accessToken: string): Record<string, string> {
   return {
     'Content-Type': 'application/json',
     Authorization: `Bearer ${accessToken}`,
-    ...(SUPABASE_ANON_KEY ? { apikey: SUPABASE_ANON_KEY } : {}),
   }
+}
+
+async function requestTurnCredentials(accessToken: string): Promise<{
+  response: Response
+  data: TurnCredentialsPayload | null
+}> {
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/get-turn-credentials`, {
+    method: 'POST',
+    headers: buildTurnAuthHeaders(accessToken),
+    body: JSON.stringify({}),
+  })
+
+  const data = await response
+    .json()
+    .catch(() => null) as TurnCredentialsPayload | null
+
+  return { response, data }
 }
 
 async function fetchIceServers(): Promise<RTCIceServer[]> {
@@ -51,27 +73,30 @@ async function fetchIceServers(): Promise<RTCIceServer[]> {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.access_token) return STUN_ONLY
 
-    const response = await fetch(`${SUPABASE_URL}/functions/v1/get-turn-credentials`, {
-      method: 'POST',
-      headers: buildTurnAuthHeaders(session.access_token),
-      body: JSON.stringify({}),
-    })
+    let result = await requestTurnCredentials(session.access_token)
 
-    const data = await response
-      .json()
-      .catch(() => null) as { urls?: string | string[]; username?: string; credential?: string; error?: string } | null
+    if (result.response.status === 401) {
+      const { data: { session: refreshedSession }, error: refreshError } = await supabase.auth.refreshSession()
 
-    if (!response.ok || !data?.urls) {
+      if (refreshError || !refreshedSession?.access_token) {
+        console.warn('[TURN] Could not refresh session, falling back to STUN only:', refreshError)
+        return STUN_ONLY
+      }
+
+      result = await requestTurnCredentials(refreshedSession.access_token)
+    }
+
+    if (!result.response.ok || !result.data?.urls) {
       console.warn('[TURN] Could not fetch credentials, falling back to STUN only:', {
-        status: response.status,
-        body: data,
+        status: result.response.status,
+        body: result.data,
       })
       return STUN_ONLY
     }
 
     return [
       ...STUN_ONLY,
-      { urls: data.urls, username: data.username, credential: data.credential },
+      { urls: result.data.urls, username: result.data.username, credential: result.data.credential },
     ]
   } catch (err) {
     console.warn('[TURN] fetchIceServers failed, falling back to STUN only:', err)
