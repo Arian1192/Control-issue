@@ -5,45 +5,25 @@ services:
       args:
         VITE_SUPABASE_URL: ${VITE_SUPABASE_URL}
         VITE_SUPABASE_ANON_KEY: ${VITE_SUPABASE_ANON_KEY}
-        VITE_TURN_URL: ${VITE_TURN_URL:-}
+        VITE_MESHCENTRAL_URL: ${VITE_MESHCENTRAL_URL:-}
     restart: unless-stopped
     expose:
       - '80'
     networks:
       - internal
 
-  coturn:
-    image: coturn/coturn:latest
+  meshcentral:
+    image: ghcr.io/ylianst/meshcentral:latest
     restart: unless-stopped
-    command:
-      - -n
-      - --fingerprint
-      - --lt-cred-mech
-      - --use-auth-secret
-      - --static-auth-secret=${TURN_SECRET}
-      - --realm=${TURN_REALM}
-      - --external-ip=${TURN_EXTERNAL_IP}
-      - --listening-port=3478
-      - --tls-listening-port=5349
-      - --min-port=49152
-      - --max-port=65535
-      - --no-multicast-peers
-      - --no-loopback-peers
-      - --denied-peer-ip=10.0.0.0-10.255.255.255
-      - --denied-peer-ip=172.16.0.0-172.31.255.255
-      - --denied-peer-ip=192.168.0.0-192.168.255.255
-      - --no-cli
-      - --log-file=stdout
-      - --simple-log
-    ports:
-      - '3478:3478/udp'
-      - '3478:3478/tcp'
-      - '5349:5349/tcp'
-      - '49152-65535:49152-65535/udp'
+    volumes:
+      - meshcentral-data:/opt/meshcentral/meshcentral-data
+      - meshcentral-files:/opt/meshcentral/meshcentral-files
+      - ./meshcentral/config.json:/opt/meshcentral/meshcentral-data/config.json:ro
     environment:
-      - TURN_SECRET=${TURN_SECRET}
-      - TURN_REALM=${TURN_REALM}
-      - TURN_EXTERNAL_IP=${TURN_EXTERNAL_IP}
+      - NODE_ENV=production
+      - HOSTNAME=${MESHCENTRAL_HOSTNAME:-localhost}
+    expose:
+      - '443'
     networks:
       - internal
 
@@ -55,9 +35,14 @@ services:
       - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
     depends_on:
       - app
+      - meshcentral
     networks:
       - internal
 
 networks:
   internal:
     driver: bridge
+
+volumes:
+  meshcentral-data:
+  meshcentral-files:

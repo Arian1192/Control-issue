@@ -1,0 +1,23 @@
+{
+  "$schema": "http://info.meshcentral.com/downloads/meshcentral-config-schema.json",
+  "settings": {
+    "Cert": "${MESHCENTRAL_HOSTNAME}",
+    "Port": 443,
+    "AliasPort": 443,
+    "RedirPort": 80,
+    "AgentPong": 300,
+    "AllowLoginToken": true,
+    "AllowFraming": true,
+    "WebRTC": false,
+    "IgnoreAgentHashCheck": false,
+    "TlsOffload": "127.0.0.1"
+  },
+  "domains": {
+    "": {
+      "Title": "Control Issue",
+      "Title2": "Remote Support",
+      "NewAccounts": false,
+      "MaxInvalidLogin": { "time": 5, "count": 5 }
+    }
+  }
+}

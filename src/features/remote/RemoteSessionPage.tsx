@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
-import { Monitor, XCircle } from 'lucide-react'
+import { ExternalLink, XCircle } from 'lucide-react'
 import { useAuth } from '@/features/auth/useAuth'
 import { useRemoteSession } from './useRemoteSession'
 import { SessionChat } from './SessionChat'
@@ -38,16 +38,13 @@ export default function RemoteSessionPage() {
   const { sessionId } = useParams<{ sessionId: string }>()
   const { profile } = useAuth()
   const navigate = useNavigate()
-  const videoRef = useRef<HTMLVideoElement>(null)
   const viewerStartedRef = useRef(false)
   const [deviceOwnerId, setDeviceOwnerId] = useState<string | null>(null)
 
   const {
     session,
-    remoteStream,
-    connectionState,
     error,
-    turnConfigured,
+    meshcentralUrl,
     startAsSharer,
     startAsViewer,
     rejectSession,
@@ -66,21 +63,15 @@ export default function RemoteSessionPage() {
       .then(({ data }) => setDeviceOwnerId(data?.owner_id ?? null))
   }, [session?.target_device_id])
 
-  useEffect(() => {
-    if (videoRef.current && remoteStream) {
-      videoRef.current.srcObject = remoteStream
-    }
-  }, [remoteStream])
-
   const isSharer = !!deviceOwnerId && deviceOwnerId === profile?.id
   const isViewer = session?.initiated_by === profile?.id
 
   useEffect(() => {
     if (!session || !isViewer || viewerStartedRef.current) return
-    if (!OPEN_STATUSES.includes(session.status)) return
+    if (session.status !== 'aceptada') return
 
     viewerStartedRef.current = true
-    startAsViewer()
+    void startAsViewer()
   }, [isViewer, session, startAsViewer])
 
   const sessionStatus = session?.status
@@ -90,13 +81,6 @@ export default function RemoteSessionPage() {
   const isAccepted = sessionStatus === 'aceptada'
   const isActive = sessionStatus === 'activa'
   const canViewerCancel = isViewer && (isPending || isAccepted)
-
-  const viewerMessage = useMemo(() => {
-    if (isPending) return 'Esperando que el usuario acepte la solicitud…'
-    if (isAccepted) return 'El usuario aceptó. Preparando conexión y compartición de pantalla…'
-    if (isActive && !remoteStream) return 'Conectando con el dispositivo…'
-    return null
-  }, [isAccepted, isActive, isPending, remoteStream])
 
   async function handleAccept() {
     await startAsSharer()
@@ -145,15 +129,15 @@ export default function RemoteSessionPage() {
         </span>
       </div>
 
-      {error && (
-        <div className="rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {error}
+      {!meshcentralUrl && (
+        <div className="rounded-md border border-yellow-200 bg-yellow-50 px-4 py-3 text-xs text-yellow-900">
+          MeshCentral URL no configurada. Configurá VITE_MESHCENTRAL_URL en el entorno.
         </div>
       )}
 
-      {!turnConfigured && isViewer && (
-        <div className="rounded-md border border-yellow-200 bg-yellow-50 px-4 py-3 text-xs text-yellow-900">
-          TURN no está configurado. Fuera de LAN la conexión es best-effort y puede fallar si no hay relay.
+      {error && (
+        <div className="rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive">
+          {error}
         </div>
       )}
 
@@ -173,7 +157,7 @@ export default function RemoteSessionPage() {
               onClick={handleAccept}
               className="rounded-md bg-green-600 px-5 py-2 text-sm font-medium text-white hover:bg-green-700"
             >
-              Aceptar y compartir pantalla
+              Aceptar
             </button>
             <button
               onClick={handleReject}
@@ -186,16 +170,51 @@ export default function RemoteSessionPage() {
       )}
 
       {isSharer && isAccepted && (
-        <div className="rounded-lg border bg-card p-6 text-center">
-          <p className="text-sm text-muted-foreground">
-            Compartiendo pantalla. Esperando que la conexión con el técnico termine de estabilizarse…
-          </p>
+        <div className="space-y-6 rounded-lg border bg-card p-6">
+          <div className="text-center">
+            <h2 className="text-base font-semibold">Instalá el agente de asistencia remota</h2>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Para que el técnico pueda ver tu pantalla, descargá e instalá el agente de Control Issue.
+            </p>
+          </div>
+
+          {meshcentralUrl ? (
+            <div className="flex justify-center">
+              <a
+                href={meshcentralUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Descargar agente
+              </a>
+            </div>
+          ) : (
+            <p className="text-center text-sm text-muted-foreground">
+              El enlace de descarga no está disponible aún. Contactá al técnico.
+            </p>
+          )}
+
+          <ol className="mx-auto max-w-xs space-y-1 text-sm text-muted-foreground">
+            <li>1. Descargá el instalador</li>
+            <li>2. Ejecutalo y seguí los pasos</li>
+            <li>3. El técnico se conectará automáticamente</li>
+          </ol>
         </div>
       )}
 
-      {isViewer && viewerMessage && (
+      {isSharer && isActive && (
+        <div className="rounded-lg border bg-card p-6 text-center">
+          <p className="text-sm text-muted-foreground">Sesión activa. El técnico puede ver tu pantalla.</p>
+        </div>
+      )}
+
+      {isViewer && isPending && (
         <div className="rounded-lg border border-dashed bg-card p-10 text-center">
-          <p className="animate-pulse text-sm text-muted-foreground">{viewerMessage}</p>
+          <p className="animate-pulse text-sm text-muted-foreground">
+            Esperando que el usuario acepte la solicitud…
+          </p>
           {canViewerCancel && (
             <button
               onClick={handleViewerCancel}
@@ -204,6 +223,45 @@ export default function RemoteSessionPage() {
               <XCircle className="h-4 w-4" />
               Cancelar solicitud
             </button>
+          )}
+        </div>
+      )}
+
+      {isViewer && isAccepted && (
+        <div className="space-y-4 rounded-lg border bg-card p-6 text-center">
+          <p className="text-sm text-muted-foreground">
+            El usuario aceptó. Pedile que instale el agente si aún no lo hizo.
+          </p>
+          {meshcentralUrl && (
+            <a
+              href={meshcentralUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm hover:bg-accent"
+            >
+              <ExternalLink className="h-4 w-4" />
+              Abrir MeshCentral
+            </a>
+          )}
+        </div>
+      )}
+
+      {isViewer && isActive && (
+        <div className="space-y-4 rounded-lg border bg-card p-6 text-center">
+          {meshcentralUrl ? (
+            <a
+              href={meshcentralUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-2 rounded-md bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+            >
+              <ExternalLink className="h-4 w-4" />
+              Abrir MeshCentral
+            </a>
+          ) : (
+            <p className="text-sm text-muted-foreground">
+              Configurá VITE_MESHCENTRAL_URL para acceder al panel de control remoto.
+            </p>
           )}
         </div>
       )}
@@ -222,38 +280,7 @@ export default function RemoteSessionPage() {
         </div>
       )}
 
-      {isViewer && isOpen && (
-        <div className="overflow-hidden rounded-lg border bg-black">
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            className="w-full"
-            style={{ minHeight: '360px' }}
-          />
-          {!remoteStream && (
-            <div className="flex h-40 items-center justify-center gap-2 text-gray-400">
-              <Monitor className="h-4 w-4" />
-              <p className="text-sm">Todavía no hay video remoto disponible.</p>
-            </div>
-          )}
-        </div>
-      )}
-
-      {isActive && (
-        <div className="flex items-center gap-2 text-xs text-muted-foreground">
-          <span
-            className={cn(
-              'h-2 w-2 rounded-full',
-              connectionState === 'connected' ? 'bg-green-500' : 'animate-pulse bg-yellow-400'
-            )}
-          />
-          {connectionState === 'connected' ? 'Conectado' : connectionState}
-        </div>
-      )}
-
-      {isActive && (
+      {isOpen && isActive && (
         <button
           onClick={handleEndSession}
           className="rounded-md bg-destructive px-4 py-2 text-sm font-medium text-destructive-foreground"
