@@ -33,8 +33,10 @@ function buildWebClientSessionUrl(rustdeskId?: string | null, rustdeskPassword?:
 
   if (RUSTDESK_WEB_CLIENT_TEMPLATE) {
     return RUSTDESK_WEB_CLIENT_TEMPLATE
-      .replaceAll('{id}', encodeURIComponent(rustdeskId))
-      .replaceAll('{password}', encodeURIComponent(rustdeskPassword ?? ''))
+      .split('{id}')
+      .join(encodeURIComponent(rustdeskId))
+      .split('{password}')
+      .join(encodeURIComponent(rustdeskPassword ?? ''))
   }
 
   return RUSTDESK_WEB_CLIENT_URL ?? ''
