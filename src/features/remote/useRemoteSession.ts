@@ -9,6 +9,15 @@ const MESHCENTRAL_URL = import.meta.env.VITE_MESHCENTRAL_URL as string | undefin
 const MESHCENTRAL_AGENT_DOWNLOAD_URL = import.meta.env.VITE_MESHCENTRAL_AGENT_DOWNLOAD_URL as
   | string
   | undefined
+const MESHCENTRAL_AGENT_WINDOWS_URL = import.meta.env.VITE_MESHCENTRAL_AGENT_WINDOWS_URL as
+  | string
+  | undefined
+const MESHCENTRAL_AGENT_MAC_INTEL_URL = import.meta.env.VITE_MESHCENTRAL_AGENT_MAC_INTEL_URL as
+  | string
+  | undefined
+const MESHCENTRAL_AGENT_MAC_ARM_URL = import.meta.env.VITE_MESHCENTRAL_AGENT_MAC_ARM_URL as
+  | string
+  | undefined
 const OPEN_STATUSES: SessionStatus[] = ['pendiente', 'aceptada', 'activa']
 
 function toAbsoluteUrl(baseUrl: string | undefined, path: string) {
@@ -139,6 +148,14 @@ export function useRemoteSession(sessionId: string | null, userId: string | null
     session,
     error,
     meshcentralUrl: MESHCENTRAL_URL ?? '',
+    meshcentralAgentDownloads: {
+      windows:
+        MESHCENTRAL_AGENT_WINDOWS_URL ??
+        MESHCENTRAL_AGENT_DOWNLOAD_URL ??
+        toAbsoluteUrl(MESHCENTRAL_URL, '/meshagents?id=4'),
+      macIntel: MESHCENTRAL_AGENT_MAC_INTEL_URL ?? toAbsoluteUrl(MESHCENTRAL_URL, '/meshagents?id=16'),
+      macArm: MESHCENTRAL_AGENT_MAC_ARM_URL ?? toAbsoluteUrl(MESHCENTRAL_URL, '/meshagents?id=29'),
+    },
     meshcentralAgentDownloadUrl:
       MESHCENTRAL_AGENT_DOWNLOAD_URL ?? toAbsoluteUrl(MESHCENTRAL_URL, '/meshagents?id=4'),
     startAsSharer,
