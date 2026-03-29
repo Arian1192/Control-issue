@@ -103,7 +103,6 @@ export default function AppLayout() {
 
     return () => {
       clearInterval(interval)
-      void supabase.from('devices').update({ is_online: false }).eq('owner_id', profileId)
     }
   }, [profile])
 
@@ -153,6 +152,22 @@ export default function AppLayout() {
     }
 
     void refreshDevicesAndPending()
+
+    const refreshInterval = setInterval(() => {
+      void refreshDevicesAndPending()
+    }, 8_000)
+
+    function handleWindowFocus() {
+      void refreshDevicesAndPending()
+    }
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'visible') {
+        void refreshDevicesAndPending()
+      }
+    }
+
+    window.addEventListener('focus', handleWindowFocus)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
 
     const sessionChannel = supabase
       .channel(`incoming_sessions:${profileId}`)
@@ -206,6 +221,9 @@ export default function AppLayout() {
 
     return () => {
       isMounted = false
+      clearInterval(refreshInterval)
+      window.removeEventListener('focus', handleWindowFocus)
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
       void supabase.removeChannel(sessionChannel)
       void supabase.removeChannel(deviceChannel)
     }
