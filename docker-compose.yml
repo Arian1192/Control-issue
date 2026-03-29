@@ -16,12 +16,22 @@ services:
     image: ghcr.io/ylianst/meshcentral:latest
     restart: unless-stopped
     volumes:
-      - ./meshcentral:/opt/meshcentral/meshcentral-data
-      - meshcentral-files-v4:/opt/meshcentral/meshcentral-files
+      - meshcentral-data-v5:/opt/meshcentral/meshcentral-data
+      - meshcentral-files-v5:/opt/meshcentral/meshcentral-files
+      - meshcentral-web-v5:/opt/meshcentral/meshcentral-web
+      - meshcentral-backups-v5:/opt/meshcentral/meshcentral-backups
     environment:
       - NODE_ENV=production
       - DYNAMIC_CONFIG=true
       - HOSTNAME=${MESHCENTRAL_HOSTNAME:-mesh.ariancoro.com}
+      - PORT=443
+      - REDIR_PORT=80
+      - ALLOW_NEW_ACCOUNTS=false
+      - IFRAME=true
+      - WEBRTC=false
+      - REVERSE_PROXY=${MESHCENTRAL_HOSTNAME:-mesh.ariancoro.com}
+      - REVERSE_PROXY_TLS_PORT=443
+      - TRUSTED_PROXY=true
     expose:
       - '443'
     networks:
@@ -30,11 +40,12 @@ services:
   cloudflared:
     image: cloudflare/cloudflared:latest
     restart: unless-stopped
-    command: tunnel --no-autoupdate run
+    command: tunnel --loglevel debug --transport-loglevel debug --no-autoupdate run
     environment:
       - TUNNEL_TOKEN=${CLOUDFLARE_TUNNEL_TOKEN}
     depends_on:
       - app
+      - meshcentral
     networks:
       - internal
 
@@ -43,4 +54,7 @@ networks:
     driver: bridge
 
 volumes:
-  meshcentral-files-v4:
+  meshcentral-data-v5:
+  meshcentral-files-v5:
+  meshcentral-web-v5:
+  meshcentral-backups-v5:
