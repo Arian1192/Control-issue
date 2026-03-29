@@ -12,6 +12,7 @@ export default function RemoteSessionPage() {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [targetDeviceOwnerId, setTargetDeviceOwnerId] = useState<string | null>(null)
   const [targetDeviceName, setTargetDeviceName] = useState<string | null>(null)
+  const [isTargetDeviceLoaded, setIsTargetDeviceLoaded] = useState(false)
 
   const {
     session,
@@ -36,6 +37,7 @@ export default function RemoteSessionPage() {
     if (!targetDeviceId) {
       setTargetDeviceOwnerId(null)
       setTargetDeviceName(null)
+      setIsTargetDeviceLoaded(false)
       return
     }
 
@@ -54,6 +56,7 @@ export default function RemoteSessionPage() {
 
       setTargetDeviceOwnerId(data?.owner_id ?? null)
       setTargetDeviceName(data?.name ?? null)
+      setIsTargetDeviceLoaded(true)
     }
 
     void loadTargetDevice()
@@ -64,10 +67,10 @@ export default function RemoteSessionPage() {
   }, [session?.target_device_id])
 
   const isInitiator = session?.initiated_by === profile?.id
-  const isDeviceOwner = Boolean(profile?.id && targetDeviceOwnerId && profile.id === targetDeviceOwnerId)
-  const canShareScreen = Boolean(
-    profile?.id && session && (targetDeviceOwnerId ? isDeviceOwner : profile.id !== session.initiated_by)
+  const isDeviceOwner = Boolean(
+    profile?.id && isTargetDeviceLoaded && targetDeviceOwnerId && profile.id === targetDeviceOwnerId
   )
+  const canShareScreen = Boolean(profile?.id && session && isDeviceOwner)
 
   useEffect(() => {
     if (!isInitiator || !isSessionOpen || connectionState !== 'idle') return
@@ -98,7 +101,9 @@ export default function RemoteSessionPage() {
 
       {session && (
         <div className="rounded-lg border bg-card px-4 py-3 text-sm text-muted-foreground">
-          {canShareScreen ? (
+          {!isTargetDeviceLoaded && session.target_device_id ? (
+            <p>Cargando información del equipo que va a compartir…</p>
+          ) : canShareScreen ? (
             <p>
               Cuando empieces, tu navegador te va a dejar elegir qué pestaña, ventana o pantalla
               compartir{targetDeviceName ? ` desde ${targetDeviceName}` : ''}.
