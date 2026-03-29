@@ -22,6 +22,7 @@ type BrowserDisplayMediaStreamOptions = DisplayMediaStreamOptions & {
 }
 
 const TURN_URL = import.meta.env.VITE_TURN_URL
+const SUPABASE_URL = import.meta.env.VITE_SUPABASE_URL
 const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY
 const CONNECTION_TIMEOUT_MS = 30_000
 const OPEN_STATUSES: SessionStatus[] = ['pendiente', 'aceptada', 'activa']
@@ -37,23 +38,34 @@ const DISPLAY_MEDIA_OPTIONS: BrowserDisplayMediaStreamOptions = {
 
 function buildTurnAuthHeaders(accessToken: string): Record<string, string> {
   return {
+    'Content-Type': 'application/json',
     Authorization: `Bearer ${accessToken}`,
     ...(SUPABASE_ANON_KEY ? { apikey: SUPABASE_ANON_KEY } : {}),
   }
 }
 
 async function fetchIceServers(): Promise<RTCIceServer[]> {
-  if (!TURN_URL) return STUN_ONLY
+  if (!TURN_URL || !SUPABASE_URL) return STUN_ONLY
 
   try {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session?.access_token) return STUN_ONLY
 
-    const { data, error } = await supabase.functions.invoke('get-turn-credentials', {
+    const response = await fetch(`${SUPABASE_URL}/functions/v1/get-turn-credentials`, {
+      method: 'POST',
       headers: buildTurnAuthHeaders(session.access_token),
+      body: JSON.stringify({}),
     })
-    if (error || !data?.urls) {
-      console.warn('[TURN] Could not fetch credentials, falling back to STUN only:', error)
+
+    const data = await response
+      .json()
+      .catch(() => null) as { urls?: string | string[]; username?: string; credential?: string; error?: string } | null
+
+    if (!response.ok || !data?.urls) {
+      console.warn('[TURN] Could not fetch credentials, falling back to STUN only:', {
+        status: response.status,
+        body: data,
+      })
       return STUN_ONLY
     }
 
