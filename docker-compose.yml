@@ -16,14 +16,13 @@ services:
     image: ghcr.io/ylianst/meshcentral:latest
     restart: unless-stopped
     volumes:
-      - meshcentral-data-v2:/opt/meshcentral/meshcentral-data
-      - meshcentral-files-v2:/opt/meshcentral/meshcentral-files
-      - ./meshcentral/config.json:/opt/meshcentral/meshcentral-data/config.json:ro
+      - meshcentral-data-v3:/opt/meshcentral/meshcentral-data
+      - meshcentral-files-v3:/opt/meshcentral/meshcentral-files
     environment:
       - NODE_ENV=production
-      - HOSTNAME=${MESHCENTRAL_HOSTNAME:-localhost}
+      - HOSTNAME=${MESHCENTRAL_HOSTNAME:-mesh.ariancoro.com}
     expose:
-      - '80'
+      - '443'
     networks:
       - internal
 
@@ -43,5 +42,5 @@ networks:
     driver: bridge
 
 volumes:
-  meshcentral-data-v2:
-  meshcentral-files-v2:
+  meshcentral-data-v3:
+  meshcentral-files-v3:
