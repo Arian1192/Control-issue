@@ -15,12 +15,29 @@ const MESHCENTRAL_AGENT_DOWNLOAD_URL = getEnv('VITE_MESHCENTRAL_AGENT_DOWNLOAD_U
 const MESHCENTRAL_AGENT_WINDOWS_URL = getEnv('VITE_MESHCENTRAL_AGENT_WINDOWS_URL')
 const MESHCENTRAL_AGENT_MAC_INTEL_URL = getEnv('VITE_MESHCENTRAL_AGENT_MAC_INTEL_URL')
 const MESHCENTRAL_AGENT_MAC_ARM_URL = getEnv('VITE_MESHCENTRAL_AGENT_MAC_ARM_URL')
+const MESHCENTRAL_AGENT_INVITE_URL = getEnv('VITE_MESHCENTRAL_AGENT_INVITE_URL')
+const MESHCENTRAL_MESH_ID = getEnv('VITE_MESHCENTRAL_MESH_ID')
 const OPEN_STATUSES: SessionStatus[] = ['pendiente', 'aceptada', 'activa']
 
 function toAbsoluteUrl(baseUrl: string | undefined, path: string) {
   if (!baseUrl) return ''
   try {
     return new URL(path, baseUrl).toString()
+  } catch {
+    return ''
+  }
+}
+
+function buildProvisionedAgentUrl(path: string, agentId: number) {
+  if (!MESHCENTRAL_MESH_ID) return ''
+  const base = toAbsoluteUrl(MESHCENTRAL_URL, path)
+  if (!base) return ''
+
+  try {
+    const url = new URL(base)
+    url.searchParams.set('id', String(agentId))
+    url.searchParams.set('meshid', MESHCENTRAL_MESH_ID)
+    return url.toString()
   } catch {
     return ''
   }
@@ -145,16 +162,21 @@ export function useRemoteSession(sessionId: string | null, userId: string | null
     session,
     error,
     meshcentralUrl: MESHCENTRAL_URL ?? '',
+    meshcentralAgentInviteUrl: MESHCENTRAL_AGENT_INVITE_URL ?? '',
     meshcentralAgentDownloads: {
       windows:
         MESHCENTRAL_AGENT_WINDOWS_URL ??
         MESHCENTRAL_AGENT_DOWNLOAD_URL ??
-        toAbsoluteUrl(MESHCENTRAL_URL, '/meshagents?id=4'),
-      macIntel: MESHCENTRAL_AGENT_MAC_INTEL_URL ?? toAbsoluteUrl(MESHCENTRAL_URL, '/meshagents?id=16'),
-      macArm: MESHCENTRAL_AGENT_MAC_ARM_URL ?? toAbsoluteUrl(MESHCENTRAL_URL, '/meshagents?id=29'),
+        buildProvisionedAgentUrl('/meshagents', 4),
+      macIntel:
+        MESHCENTRAL_AGENT_MAC_INTEL_URL ??
+        buildProvisionedAgentUrl('/meshosxagent', 16),
+      macArm:
+        MESHCENTRAL_AGENT_MAC_ARM_URL ??
+        buildProvisionedAgentUrl('/meshosxagent', 29),
     },
     meshcentralAgentDownloadUrl:
-      MESHCENTRAL_AGENT_DOWNLOAD_URL ?? toAbsoluteUrl(MESHCENTRAL_URL, '/meshagents?id=4'),
+      MESHCENTRAL_AGENT_DOWNLOAD_URL ?? buildProvisionedAgentUrl('/meshagents', 4),
     startAsSharer,
     startAsViewer,
     rejectSession,

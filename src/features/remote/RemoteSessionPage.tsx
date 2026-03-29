@@ -44,6 +44,7 @@ export default function RemoteSessionPage() {
     session,
     error,
     meshcentralUrl,
+    meshcentralAgentInviteUrl,
     meshcentralAgentDownloads,
     startAsSharer,
     startAsViewer,
@@ -222,6 +223,23 @@ export default function RemoteSessionPage() {
             </p>
           </div>
 
+          {meshcentralAgentInviteUrl && (
+            <div className="text-center">
+              <a
+                href={meshcentralAgentInviteUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm hover:bg-accent"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Abrir instalador guiado de MeshCentral
+              </a>
+              <p className="mt-2 text-xs text-muted-foreground">
+                Recomendado: este enlace suele incluir el dispositivo preasignado.
+              </p>
+            </div>
+          )}
+
           {availableAgentOptions.length > 0 ? (
             <div className="grid gap-2 sm:grid-cols-3">
               {availableAgentOptions.map((option) => {
@@ -251,7 +269,7 @@ export default function RemoteSessionPage() {
             </div>
           ) : (
             <p className="text-center text-sm text-muted-foreground">
-              El enlace de descarga no está disponible aún. Contactá al técnico.
+              No hay enlaces de descarga configurados para este entorno.
             </p>
           )}
 
