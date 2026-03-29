@@ -26,11 +26,24 @@ const RUSTDESK_DOWNLOAD_WINDOWS_URL = getEnv('VITE_RUSTDESK_DOWNLOAD_WINDOWS_URL
 const RUSTDESK_DOWNLOAD_MAC_INTEL_URL = getEnv('VITE_RUSTDESK_DOWNLOAD_MAC_INTEL_URL')
 const RUSTDESK_DOWNLOAD_MAC_ARM_URL = getEnv('VITE_RUSTDESK_DOWNLOAD_MAC_ARM_URL')
 const RUSTDESK_DOWNLOAD_LINUX_URL = getEnv('VITE_RUSTDESK_DOWNLOAD_LINUX_URL')
+const RUSTDESK_FORCE_PUBLIC_FALLBACK =
+  getEnv('VITE_RUSTDESK_FORCE_PUBLIC_FALLBACK') === 'true' || RUSTDESK_ID_SERVER === 'rd.ariancoro.com'
+
+const EFFECTIVE_ID_SERVER = RUSTDESK_FORCE_PUBLIC_FALLBACK ? undefined : RUSTDESK_ID_SERVER
+const EFFECTIVE_RELAY_SERVER = RUSTDESK_FORCE_PUBLIC_FALLBACK ? undefined : RUSTDESK_RELAY_SERVER
+const EFFECTIVE_KEY = RUSTDESK_FORCE_PUBLIC_FALLBACK ? undefined : RUSTDESK_KEY
+
+const DEFAULT_RUSTDESK_DOWNLOAD_URL = 'https://github.com/rustdesk/rustdesk/releases/latest'
+const DEFAULT_WINDOWS_DOWNLOAD_URL = `${DEFAULT_RUSTDESK_DOWNLOAD_URL}`
+const DEFAULT_MAC_INTEL_DOWNLOAD_URL = `${DEFAULT_RUSTDESK_DOWNLOAD_URL}`
+const DEFAULT_MAC_ARM_DOWNLOAD_URL = `${DEFAULT_RUSTDESK_DOWNLOAD_URL}`
+const DEFAULT_LINUX_DOWNLOAD_URL = `${DEFAULT_RUSTDESK_DOWNLOAD_URL}`
 
 const OPEN_STATUSES: SessionStatus[] = ['pendiente', 'aceptada', 'activa']
 
 function buildWebClientSessionUrl(rustdeskId?: string | null, rustdeskPassword?: string | null) {
   if (!RUSTDESK_WEB_CLIENT_ENABLED) return ''
+  if (RUSTDESK_FORCE_PUBLIC_FALLBACK) return ''
   if (!rustdeskId) return ''
 
   if (RUSTDESK_WEB_CLIENT_TEMPLATE) {
@@ -52,16 +65,21 @@ function buildNativeConnectionSummary(rustdeskId?: string | null, rustdeskPasswo
     lines.push(`Contraseña: ${rustdeskPassword.trim()}`)
   }
 
-  if (RUSTDESK_ID_SERVER) {
-    lines.push(`ID Server: ${RUSTDESK_ID_SERVER}`)
+  if (RUSTDESK_FORCE_PUBLIC_FALLBACK) {
+    lines.push('Servidor: red pública oficial de RustDesk')
+    return lines.join('\n')
   }
 
-  if (RUSTDESK_RELAY_SERVER) {
-    lines.push(`Relay Server: ${RUSTDESK_RELAY_SERVER}`)
+  if (EFFECTIVE_ID_SERVER) {
+    lines.push(`ID Server: ${EFFECTIVE_ID_SERVER}`)
   }
 
-  if (RUSTDESK_KEY) {
-    lines.push(`Key: ${RUSTDESK_KEY}`)
+  if (EFFECTIVE_RELAY_SERVER) {
+    lines.push(`Relay Server: ${EFFECTIVE_RELAY_SERVER}`)
+  }
+
+  if (EFFECTIVE_KEY) {
+    lines.push(`Key: ${EFFECTIVE_KEY}`)
   }
 
   return lines.join('\n')
@@ -217,17 +235,19 @@ export function useRemoteSession(sessionId: string | null, userId: string | null
     session,
     error,
     rustdesk: {
-      idServer: RUSTDESK_ID_SERVER ?? '',
-      relayServer: RUSTDESK_RELAY_SERVER ?? '',
-      key: RUSTDESK_KEY ?? '',
+      idServer: EFFECTIVE_ID_SERVER ?? '',
+      relayServer: EFFECTIVE_RELAY_SERVER ?? '',
+      key: EFFECTIVE_KEY ?? '',
+      usingPublicNetwork:
+        RUSTDESK_FORCE_PUBLIC_FALLBACK || (!EFFECTIVE_ID_SERVER && !EFFECTIVE_RELAY_SERVER && !EFFECTIVE_KEY),
       webClientEnabled: RUSTDESK_WEB_CLIENT_ENABLED,
       webClientUrl: RUSTDESK_WEB_CLIENT_ENABLED ? (RUSTDESK_WEB_CLIENT_URL ?? '') : '',
       webClientTemplate: RUSTDESK_WEB_CLIENT_TEMPLATE ?? '',
       downloads: {
-        windows: RUSTDESK_DOWNLOAD_WINDOWS_URL ?? '',
-        macIntel: RUSTDESK_DOWNLOAD_MAC_INTEL_URL ?? '',
-        macArm: RUSTDESK_DOWNLOAD_MAC_ARM_URL ?? '',
-        linux: RUSTDESK_DOWNLOAD_LINUX_URL ?? '',
+        windows: RUSTDESK_DOWNLOAD_WINDOWS_URL ?? DEFAULT_WINDOWS_DOWNLOAD_URL,
+        macIntel: RUSTDESK_DOWNLOAD_MAC_INTEL_URL ?? DEFAULT_MAC_INTEL_DOWNLOAD_URL,
+        macArm: RUSTDESK_DOWNLOAD_MAC_ARM_URL ?? DEFAULT_MAC_ARM_DOWNLOAD_URL,
+        linux: RUSTDESK_DOWNLOAD_LINUX_URL ?? DEFAULT_LINUX_DOWNLOAD_URL,
       },
       sessionWebClientUrl: buildWebClientSessionUrl(session?.rustdesk_id, session?.rustdesk_password),
       nativeSessionSummary: buildNativeConnectionSummary(session?.rustdesk_id, session?.rustdesk_password),

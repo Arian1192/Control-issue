@@ -260,11 +260,18 @@ export default function RemoteSessionPage() {
         </span>
       </div>
 
-      {(!rustdesk.idServer || !rustdesk.key) && (
-        <div className="rounded-md border border-yellow-200 bg-yellow-50 px-4 py-3 text-xs text-yellow-900">
-          Configuración incompleta: definí <strong>VITE_RUSTDESK_ID_SERVER</strong> y{' '}
-          <strong>VITE_RUSTDESK_KEY</strong>.
+      {rustdesk.usingPublicNetwork ? (
+        <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-xs text-blue-900">
+          Modo contingencia activo: usá RustDesk en su red pública (sin configurar ID Server/Relay/Key).
+          Si habías cargado servidor privado en RustDesk, restablecé a configuración oficial.
         </div>
+      ) : (
+        (!rustdesk.idServer || !rustdesk.key) && (
+          <div className="rounded-md border border-yellow-200 bg-yellow-50 px-4 py-3 text-xs text-yellow-900">
+            Configuración incompleta: definí <strong>VITE_RUSTDESK_ID_SERVER</strong> y{' '}
+            <strong>VITE_RUSTDESK_KEY</strong>.
+          </div>
+        )
       )}
 
       {error && (
@@ -312,7 +319,7 @@ export default function RemoteSessionPage() {
           <div className="text-center">
             <h2 className="text-base font-semibold">Instalá y abrí RustDesk</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Descargá RustDesk, conectalo a este servidor y compartí tu ID para que el técnico te asista.
+              Descargá RustDesk, abrilo y compartí tu ID para que el técnico te asista.
             </p>
           </div>
 
@@ -349,21 +356,32 @@ export default function RemoteSessionPage() {
             </p>
           )}
 
-          <div className="rounded-lg border bg-muted/30 p-4 text-sm">
-            <p className="font-medium">Configuración del servidor RustDesk</p>
-            <div className="mt-2 space-y-1 text-xs text-muted-foreground">
-              <p>
-                ID Server: <strong className="text-foreground">{rustdesk.idServer || '—'}</strong>
-              </p>
-              <p>
-                Relay Server:{' '}
-                <strong className="text-foreground">{rustdesk.relayServer || '(auto)'}</strong>
-              </p>
-              <p>
-                Key: <strong className="break-all text-foreground">{rustdesk.key || '—'}</strong>
-              </p>
+          {rustdesk.usingPublicNetwork ? (
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
+              <p className="font-medium">Configuración recomendada (rápida)</p>
+              <div className="mt-2 space-y-1 text-xs">
+                <p>1) Abrí RustDesk recién instalado.</p>
+                <p>2) No configures servidor privado.</p>
+                <p>3) Copiá tu ID y pegalo acá.</p>
+              </div>
             </div>
-          </div>
+          ) : (
+            <div className="rounded-lg border bg-muted/30 p-4 text-sm">
+              <p className="font-medium">Configuración del servidor RustDesk</p>
+              <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                <p>
+                  ID Server: <strong className="text-foreground">{rustdesk.idServer || '—'}</strong>
+                </p>
+                <p>
+                  Relay Server:{' '}
+                  <strong className="text-foreground">{rustdesk.relayServer || '(auto)'}</strong>
+                </p>
+                <p>
+                  Key: <strong className="break-all text-foreground">{rustdesk.key || '—'}</strong>
+                </p>
+              </div>
+            </div>
+          )}
 
           <div className="grid gap-3 rounded-lg border p-4 md:grid-cols-2">
             <label className="space-y-1 text-left text-sm">

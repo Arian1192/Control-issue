@@ -64,6 +64,12 @@ Sin esos permisos, no hay control remoto completo.
 - Confirmar DNS directo (sin proxy) para dominio RustDesk.
 - Probar con `RUSTDESK_ALWAYS_USE_RELAY=Y` si hay NAT compleja.
 
+### `rd.*` da 521 / infraestructura privada caída
+
+- Activar `VITE_RUSTDESK_FORCE_PUBLIC_FALLBACK=true`.
+- Eso fuerza modo contingencia en la UI: usar red pública oficial de RustDesk.
+- En ese modo no configurar `ID Server/Relay/Key` en el cliente.
+
 ### En la app no llega la actualización de sesión
 
 - Revisar conexión Realtime de Supabase en ambos navegadores.
@@ -78,6 +84,7 @@ VITE_RUSTDESK_ID_SERVER=rd.tudominio.com
 VITE_RUSTDESK_RELAY_SERVER=rd.tudominio.com:21117
 VITE_RUSTDESK_KEY=<contenido-id_ed25519.pub>
 VITE_RUSTDESK_WEB_CLIENT_ENABLED=false
+VITE_RUSTDESK_FORCE_PUBLIC_FALLBACK=false
 VITE_RUSTDESK_WEB_CLIENT_URL=https://rd.tudominio.com
 VITE_RUSTDESK_WEB_CLIENT_TEMPLATE=
 VITE_RUSTDESK_DOWNLOAD_WINDOWS_URL=
