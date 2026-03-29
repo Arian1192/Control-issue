@@ -44,6 +44,7 @@ export default function RemoteSessionPage() {
     session,
     error,
     meshcentralUrl,
+    meshcentralAgentDownloadUrl,
     startAsSharer,
     startAsViewer,
     rejectSession,
@@ -169,16 +170,16 @@ export default function RemoteSessionPage() {
             </p>
           </div>
 
-          {meshcentralUrl ? (
+          {meshcentralAgentDownloadUrl ? (
             <div className="flex justify-center">
               <a
-                href={meshcentralUrl}
+                href={meshcentralAgentDownloadUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 rounded-md bg-primary px-5 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
               >
                 <ExternalLink className="h-4 w-4" />
-                Descargar agente
+                Descargar agente (Windows)
               </a>
             </div>
           ) : (

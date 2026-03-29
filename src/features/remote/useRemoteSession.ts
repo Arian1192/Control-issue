@@ -6,7 +6,19 @@ type RemoteSession = Database['public']['Tables']['remote_sessions']['Row']
 type RemoteSessionUpdate = Database['public']['Tables']['remote_sessions']['Update']
 
 const MESHCENTRAL_URL = import.meta.env.VITE_MESHCENTRAL_URL as string | undefined
+const MESHCENTRAL_AGENT_DOWNLOAD_URL = import.meta.env.VITE_MESHCENTRAL_AGENT_DOWNLOAD_URL as
+  | string
+  | undefined
 const OPEN_STATUSES: SessionStatus[] = ['pendiente', 'aceptada', 'activa']
+
+function toAbsoluteUrl(baseUrl: string | undefined, path: string) {
+  if (!baseUrl) return ''
+  try {
+    return new URL(path, baseUrl).toString()
+  } catch {
+    return ''
+  }
+}
 
 export function useRemoteSession(sessionId: string | null, userId: string | null) {
   const [session, setSession] = useState<RemoteSession | null>(null)
@@ -127,6 +139,8 @@ export function useRemoteSession(sessionId: string | null, userId: string | null
     session,
     error,
     meshcentralUrl: MESHCENTRAL_URL ?? '',
+    meshcentralAgentDownloadUrl:
+      MESHCENTRAL_AGENT_DOWNLOAD_URL ?? toAbsoluteUrl(MESHCENTRAL_URL, '/meshagents?id=4'),
     startAsSharer,
     startAsViewer,
     rejectSession,
