@@ -30,7 +30,7 @@ services:
       - HOSTNAME=${MESHCENTRAL_HOSTNAME:-mesh.ariancoro.com}
       - PORT=443
       - REDIR_PORT=80
-      - ALLOW_NEW_ACCOUNTS=false
+      - ALLOW_NEW_ACCOUNTS=true
       - IFRAME=true
       - WEBRTC=false
       - REVERSE_PROXY=${MESHCENTRAL_HOSTNAME:-mesh.ariancoro.com}
