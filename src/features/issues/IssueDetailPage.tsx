@@ -17,6 +17,11 @@ const ALLOWED_MIME = [
   'image/jpeg', 'image/png', 'image/gif', 'image/webp',
   'application/pdf', 'text/plain', 'text/csv',
 ]
+const OPEN_REMOTE_SESSION_STATUSES: Database['public']['Tables']['remote_sessions']['Row']['status'][] = [
+  'pendiente',
+  'aceptada',
+  'activa',
+]
 
 export default function IssueDetailPage() {
   const { id } = useParams<{ id: string }>()
@@ -204,6 +209,18 @@ export default function IssueDetailPage() {
       return
     }
 
+    const { data: existingOpenSession } = await supabase
+      .from('remote_sessions')
+      .select('id')
+      .eq('target_device_id', selectedDevice)
+      .in('status', OPEN_REMOTE_SESSION_STATUSES)
+      .maybeSingle()
+
+    if (existingOpenSession) {
+      navigate(`/remote/${existingOpenSession.id}`)
+      return
+    }
+
     setStartingSession(true)
     const { data, error } = await supabase
       .from('remote_sessions')
@@ -218,6 +235,23 @@ export default function IssueDetailPage() {
 
     setStartingSession(false)
     if (error) {
+      if (
+        error.code === '23505' ||
+        error.message.includes('remote_sessions_one_open_per_device_idx')
+      ) {
+        const { data: conflictedOpenSession } = await supabase
+          .from('remote_sessions')
+          .select('id')
+          .eq('target_device_id', selectedDevice)
+          .in('status', OPEN_REMOTE_SESSION_STATUSES)
+          .maybeSingle()
+
+        if (conflictedOpenSession) {
+          navigate(`/remote/${conflictedOpenSession.id}`)
+          return
+        }
+      }
+
       setRemoteError(error.message)
       return
     }
