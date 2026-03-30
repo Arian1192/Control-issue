@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
-import { Monitor } from 'lucide-react'
+import { Link2, Monitor } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import { useAuth } from '@/features/auth/useAuth'
 import type { Database, IssueStatus } from '@/types'
@@ -30,7 +30,10 @@ export default function IssueDetailPage() {
   const [devices, setDevices] = useState<Device[]>([])
   const [selectedDevice, setSelectedDevice] = useState('')
   const [startingSession, setStartingSession] = useState(false)
+  const [generatingInvite, setGeneratingInvite] = useState(false)
   const [remoteError, setRemoteError] = useState<string | null>(null)
+  const [inviteLink, setInviteLink] = useState<string | null>(null)
+  const [inviteFeedback, setInviteFeedback] = useState<string | null>(null)
   const [assignees, setAssignees] = useState<Assignee[]>([])
   const commentsEndRef = useRef<HTMLDivElement>(null)
 
@@ -198,6 +201,7 @@ export default function IssueDetailPage() {
   async function handleStartRemoteSession() {
     if (!selectedDevice || !profile || !id) return
     setRemoteError(null)
+    setInviteFeedback(null)
     const device = devices.find((d) => d.id === selectedDevice)
     if (!device?.is_online) {
       setRemoteError('El dispositivo no está en línea todavía. Esperá a que el usuario aparezca como disponible.')
@@ -219,9 +223,50 @@ export default function IssueDetailPage() {
     navigate(`/remote/${data.id}`)
   }
 
+  async function handleGenerateAccessLink() {
+    if (!profile || !issue || !id) return
+
+    setGeneratingInvite(true)
+    setRemoteError(null)
+    setInviteFeedback(null)
+
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+    const { data, error } = await supabase
+      .from('device_invites')
+      .insert({
+        invited_by: profile.id,
+        invited_user_id: issue.created_by,
+        issue_id: id,
+        expires_at: expiresAt,
+      })
+      .select('token')
+      .single()
+
+    if (error || !data?.token) {
+      setRemoteError(error?.message ?? 'No se pudo generar el link de acceso.')
+      setGeneratingInvite(false)
+      return
+    }
+
+    const nextInviteLink = `${window.location.origin}/invite/${data.token}`
+    setInviteLink(nextInviteLink)
+
+    try {
+      await navigator.clipboard.writeText(nextInviteLink)
+      setInviteFeedback('Link copiado. Pedile al usuario que lo abra desde el ordenador a asistir.')
+    } catch {
+      setInviteFeedback('No se pudo copiar automáticamente. Compartí manualmente el link que aparece abajo.')
+    }
+
+    setGeneratingInvite(false)
+  }
+
   const canChangeStatus =
     profile?.role === 'admin-it' ||
     (profile?.role === 'technician' && issue?.assigned_to === profile.id)
+  const selectedDeviceRow = devices.find((device) => device.id === selectedDevice)
+  const hasDevices = devices.length > 0
+  const hasOnlineDevices = devices.some((device) => device.is_online)
 
   if (loading) return <div className="py-8 text-center text-sm text-muted-foreground">Cargando...</div>
   if (!issue) return <div className="py-8 text-center text-sm text-destructive">Incidencia no encontrada.</div>
@@ -288,33 +333,87 @@ export default function IssueDetailPage() {
               {remoteError}
             </div>
           )}
-          {devices.length === 0 ? (
-            <p className="text-xs text-muted-foreground">
-              El usuario no tiene dispositivos registrados.
-            </p>
-          ) : (
-            <div className="flex flex-wrap items-center gap-2">
-              <select
-                value={selectedDevice}
-                onChange={(e) => setSelectedDevice(e.target.value)}
-                className="rounded-md border border-input bg-background px-2 py-1.5 text-sm"
-              >
-                {devices.map((d) => (
-                  <option key={d.id} value={d.id}>
-                    {d.name} {d.is_online ? '🟢' : '🔴'}
-                  </option>
-                ))}
-              </select>
+          {inviteFeedback && (
+            <div className="mb-3 rounded-md border border-emerald-200 bg-emerald-50 px-3 py-2 text-xs text-emerald-900">
+              {inviteFeedback}
+            </div>
+          )}
+          {inviteLink && (
+            <div className="mb-3 rounded-md border bg-muted/30 p-3">
+              <p className="mb-2 text-xs text-muted-foreground">Link de acceso para compartir con el usuario</p>
+              <input
+                readOnly
+                value={inviteLink}
+                className="w-full rounded-md border border-input bg-background px-3 py-2 text-xs"
+              />
+            </div>
+          )}
+          {!hasDevices ? (
+            <div className="space-y-3">
+              <p className="text-xs text-muted-foreground">
+                El usuario todavía no tiene dispositivos registrados. Generá un link para que autorice este ordenador y
+                después continúe con RustDesk.
+              </p>
               <button
-                onClick={handleStartRemoteSession}
-                disabled={startingSession || !devices.find((d) => d.id === selectedDevice)?.is_online}
-                className={cn(
-                  'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
-                  'bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50'
-                )}
+                onClick={handleGenerateAccessLink}
+                disabled={generatingInvite}
+                className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-accent disabled:opacity-50"
               >
-                {startingSession ? 'Iniciando...' : 'Iniciar asistencia remota'}
+                <Link2 className="h-4 w-4" />
+                {generatingInvite ? 'Generando…' : 'Generar enlace de acceso'}
               </button>
+            </div>
+          ) : (
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <select
+                  value={selectedDevice}
+                  onChange={(e) => setSelectedDevice(e.target.value)}
+                  className="rounded-md border border-input bg-background px-2 py-1.5 text-sm"
+                >
+                  {devices.map((d) => (
+                    <option key={d.id} value={d.id}>
+                      {d.name} {d.is_online ? '🟢' : '🔴'}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  onClick={handleStartRemoteSession}
+                  disabled={startingSession || !selectedDeviceRow?.is_online}
+                  className={cn(
+                    'rounded-md px-3 py-1.5 text-sm font-medium transition-colors',
+                    'bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50'
+                  )}
+                >
+                  {startingSession ? 'Iniciando...' : 'Iniciar asistencia remota'}
+                </button>
+                {!selectedDeviceRow?.is_online && (
+                  <button
+                    onClick={handleGenerateAccessLink}
+                    disabled={generatingInvite}
+                    className="inline-flex items-center gap-2 rounded-md border px-3 py-1.5 text-sm hover:bg-accent disabled:opacity-50"
+                  >
+                    <Link2 className="h-4 w-4" />
+                    {generatingInvite ? 'Generando…' : 'Generar enlace de acceso'}
+                  </button>
+                )}
+              </div>
+
+              {selectedDeviceRow?.is_online ? (
+                <p className="text-xs text-muted-foreground">
+                  El dispositivo está disponible. Al iniciar, la app abrirá o recuperará la sesión remota actual.
+                </p>
+              ) : hasOnlineDevices ? (
+                <p className="text-xs text-muted-foreground">
+                  Este dispositivo está offline. Elegí uno en línea o generá un enlace para que el usuario autorice el
+                  equipo desde el que necesita ayuda.
+                </p>
+              ) : (
+                <p className="text-xs text-muted-foreground">
+                  No hay dispositivos en línea ahora mismo. Generá un enlace para que el usuario abra la sesión desde
+                  su ordenador actual.
+                </p>
+              )}
             </div>
           )}
         </div>

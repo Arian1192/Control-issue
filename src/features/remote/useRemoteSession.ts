@@ -157,7 +157,7 @@ export function useRemoteSession(sessionId: string | null, userId: string | null
     await updateSession({
       status: 'aceptada',
       accepted_at: sessionRef.current?.accepted_at ?? new Date().toISOString(),
-      connection_phase: 'awaiting-agent',
+      connection_phase: 'awaiting-rustdesk-install',
       failure_reason: null,
       ended_at: null,
       rustdesk_id: null,
@@ -175,7 +175,7 @@ export function useRemoteSession(sessionId: string | null, userId: string | null
     }
 
     return updateSession({
-      connection_phase: 'agent-ready',
+      connection_phase: 'ready-for-technician',
       failure_reason: null,
       rustdesk_id: rustdeskId,
       rustdesk_password: payload.rustdeskPassword?.trim() || null,
@@ -197,7 +197,7 @@ export function useRemoteSession(sessionId: string | null, userId: string | null
     await updateSession({
       status: 'activa',
       started_at: sessionRef.current?.started_at ?? new Date().toISOString(),
-      connection_phase: 'connected',
+      connection_phase: 'active',
       failure_reason: null,
     })
   }
@@ -205,7 +205,7 @@ export function useRemoteSession(sessionId: string | null, userId: string | null
   async function rejectSession() {
     await updateSession({
       status: 'rechazada',
-      connection_phase: 'idle',
+      connection_phase: 'closing',
       failure_reason: null,
       rustdesk_password: null,
       ended_at: new Date().toISOString(),

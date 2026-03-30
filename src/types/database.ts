@@ -82,6 +82,7 @@ export type Database = {
           device_id: string | null
           expires_at: string
           id: string
+          issue_id: string | null
           invited_by: string
           invited_user_id: string
           session_id: string | null
@@ -93,6 +94,7 @@ export type Database = {
           device_id?: string | null
           expires_at: string
           id?: string
+          issue_id?: string | null
           invited_by: string
           invited_user_id: string
           session_id?: string | null
@@ -104,6 +106,7 @@ export type Database = {
           device_id?: string | null
           expires_at?: string
           id?: string
+          issue_id?: string | null
           invited_by?: string
           invited_user_id?: string
           session_id?: string | null
@@ -116,6 +119,13 @@ export type Database = {
             columns: ['device_id']
             isOneToOne: false
             referencedRelation: 'devices'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'device_invites_issue_id_fkey'
+            columns: ['issue_id']
+            isOneToOne: false
+            referencedRelation: 'issues'
             referencedColumns: ['id']
           },
           {
@@ -342,6 +352,7 @@ export type Database = {
         Row: {
           accepted_at: string | null
           connection_phase: string
+          created_at: string
           ended_at: string | null
           failure_reason: string | null
           id: string
@@ -358,6 +369,7 @@ export type Database = {
         Insert: {
           accepted_at?: string | null
           connection_phase?: string
+          created_at?: string
           ended_at?: string | null
           failure_reason?: string | null
           id?: string
@@ -374,6 +386,7 @@ export type Database = {
         Update: {
           accepted_at?: string | null
           connection_phase?: string
+          created_at?: string
           ended_at?: string | null
           failure_reason?: string | null
           id?: string
@@ -416,11 +429,20 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      accept_device_invite: {
+        Args: { p_device_name?: string; p_token: string }
+        Returns: {
+          already_consumed: boolean
+          device_id: string
+          session_id: string | null
+        }[]
+      }
       create_or_get_open_remote_session: {
         Args: { p_issue_id: string | null; p_target_device_id: string }
         Returns: {
           accepted_at: string | null
           connection_phase: string
+          created_at: string
           ended_at: string | null
           failure_reason: string | null
           id: string

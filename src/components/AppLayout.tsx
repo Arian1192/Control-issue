@@ -237,7 +237,12 @@ export default function AppLayout() {
   async function rejectSession(sessionId: string) {
     await supabase
       .from('remote_sessions')
-      .update({ status: 'rechazada', ended_at: new Date().toISOString() })
+      .update({
+        status: 'rechazada',
+        connection_phase: 'closing',
+        rustdesk_password: null,
+        ended_at: new Date().toISOString(),
+      })
       .eq('id', sessionId)
 
     setPendingSessions((current) => current.filter((session) => session.id !== sessionId))

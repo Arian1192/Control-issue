@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { useLocation } from 'react-router-dom'
 import { Monitor, Wifi, WifiOff } from 'lucide-react'
 import { supabase } from '@/lib/supabaseClient'
 import { useAuth } from '@/features/auth/useAuth'
@@ -9,10 +10,12 @@ type Device = Database['public']['Tables']['devices']['Row']
 
 export default function DevicesPage() {
   const { profile } = useAuth()
+  const location = useLocation()
   const [devices, setDevices] = useState<Device[]>([])
   const [loading, setLoading] = useState(true)
   const [newName, setNewName] = useState('')
   const [adding, setAdding] = useState(false)
+  const inviteMessage = (location.state as { inviteMessage?: string } | null)?.inviteMessage
 
   useEffect(() => {
     if (!profile) return
@@ -55,6 +58,12 @@ export default function DevicesPage() {
   return (
     <div className="space-y-4">
       <h1 className="text-xl font-semibold">Mis dispositivos</h1>
+
+      {inviteMessage && (
+        <div className="rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-900">
+          {inviteMessage}
+        </div>
+      )}
 
       <div className="flex gap-2">
         <input

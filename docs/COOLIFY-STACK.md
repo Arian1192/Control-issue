@@ -40,7 +40,7 @@ CLOUDFLARE_TUNNEL_TOKEN=
 1. En Coolify, crea/actualiza un recurso tipo **Stack** desde este repositorio.
 2. Usa el `docker-compose.yml` de raíz.
 3. Carga las variables de entorno del bloque anterior.
-4. Asegurate de abrir puertos en el host:
+4. Asegurate de abrir puertos en el host para RustDesk OSS:
    - `21115/tcp`
    - `21116/tcp`
    - `21116/udp`
@@ -52,6 +52,13 @@ CLOUDFLARE_TUNNEL_TOKEN=
 
 > Importante: Cloudflare Tunnel está pensado para HTTP(S) público y TCP privado vía WARP.
 > Para RustDesk self-host (21115-21119), usá DNS directo a la IP del host.
+
+## Alcance operativo del MVP
+
+- Camino principal del técnico: **cliente nativo de RustDesk**
+- Camino principal del usuario: descarga guiada desde la app + carga manual de `ID`/contraseña temporal
+- El web client queda como **opcional**, no como requisito para cerrar la implementación
+- Si el usuario todavía no tiene dispositivo registrado, la app genera un link `/invite/:token` para autorizar el equipo desde el que necesita ayuda
 
 ## Clave RustDesk (importante)
 
@@ -68,6 +75,7 @@ La app no transporta video remoto. La app:
 
 1. crea y coordina la sesión (Supabase),
 2. guía al usuario en instalación/configuración,
-3. entrega al técnico el `ID`/password de RustDesk.
+3. permite fallback con link de acceso para registrar el equipo,
+4. entrega al técnico el `ID`/password de RustDesk.
 
 La conexión remota real ocurre en RustDesk (`hbbs`/`hbbr`).

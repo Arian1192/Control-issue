@@ -8,8 +8,10 @@ export type {
 } from './database'
 
 export type SessionConnectionPhase =
-  | 'idle'
-  | 'signaling'
-  | 'connected'
+  | 'awaiting-user-acceptance'
+  | 'awaiting-rustdesk-install'
+  | 'awaiting-rustdesk-credentials'
+  | 'ready-for-technician'
+  | 'active'
   | 'closing'
   | 'failed'

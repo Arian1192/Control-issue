@@ -12,9 +12,9 @@ Los departamentos de IT necesitan un canal estructurado para que los empleados r
 
 1. **Gestión de incidencias** — Los usuarios reportan problemas con título, descripción y prioridad. Los técnicos gestionan el ciclo de vida (abierto → en-progreso → resuelto → cerrado), añaden comentarios en tiempo real y adjuntan archivos (logs, capturas). Los admins asignan incidencias a técnicos o a sí mismos. Desde el detalle de una incidencia se puede iniciar directamente una sesión de asistencia remota.
 
-2. **Asistencia remota** — Los técnicos y admins inician sesiones remotas desde incidencias o dispositivos. La app coordina el flujo (`pendiente → aceptada → activa → finalizada/rechazada/fallida/cancelada`) y realiza handoff a RustDesk self-hosted: el usuario comparte su ID y credenciales temporales, y el técnico se conecta usando RustDesk (cliente local o web).
+2. **Asistencia remota** — Los técnicos y admins inician sesiones remotas desde incidencias o dispositivos. La app coordina el flujo (`pendiente → aceptada → activa → finalizada/rechazada/fallida/cancelada`) y realiza handoff a RustDesk self-hosted: el usuario comparte su ID y credenciales temporales, y el técnico se conecta usando RustDesk (camino principal: cliente nativo; cliente web opcional).
 
-3. **Invitación de dispositivos** — El admin-it genera un link de invitación (`/invite/:token`) para que un usuario registre su equipo sin configuración manual. El link expira en 24 horas, es de un solo uso, y opcionalmente lleva asociada una sesión remota pendiente. El dispositivo se registra automáticamente con nombre inferido del user-agent.
+3. **Invitación de dispositivos** — El admin-it o technician genera un link de invitación (`/invite/:token`) para que un usuario registre su equipo sin configuración manual. El link expira en 24 horas, es de un solo uso, y puede quedar vinculado a una incidencia o a una sesión remota pendiente. El dispositivo se registra automáticamente con nombre inferido del user-agent.
 
 4. **Gestión de dispositivos** — Los usuarios registran sus ordenadores desde `DevicesPage`. El sistema detecta el estado online/offline mediante heartbeat cada 30 segundos y almacena la IP local (vía WebRTC STUN). Los dispositivos se pueden renombrar o eliminar.
 
@@ -49,7 +49,7 @@ Los departamentos de IT necesitan un canal estructurado para que los empleados r
 - **`is_active`** en `profiles`: usuarios desactivados quedan excluidos de todas las políticas RLS
 - **Edge Function `admin-create-user`**: operaciones privilegiadas (crear/actualizar usuarios en `auth.users`) se ejecutan en servidor con `service_role_key`, nunca expuesta al cliente
 - La función verifica el JWT del llamante con `adminClient.auth.getUser()` y comprueba `role = 'admin-it'` antes de operar
-- **`device_invites`**: tokens UUID de un solo uso con expiración, gestionados con RLS por `invited_by` e `invited_user_id`
+- **`device_invites`**: tokens UUID de un solo uso con expiración, gestionados con RLS por `invited_by` e `invited_user_id`, con contexto opcional de `issue_id` / `session_id` para continuar el flujo remoto
 
 ## Estructura del repositorio
 
@@ -78,6 +78,7 @@ Control-issue/
       011_device_invites_fk_set_null.sql ← FK device_invites ON DELETE SET NULL
       012_remote_sessions_rustdesk_pivot.sql ← Lifecycle remoto + metadatos RustDesk + índice de sesión única
       013_remote_sessions_atomic_start.sql ← RPC atómica para crear/recuperar sesión abierta por dispositivo
+      014_reconcile_remote_invites_and_phases.sql ← Reconciliación de invites, created_at y fases canónicas
   openspec/
     specs/           ← PROJECT.md, AGENTS.md, specs por capacidad
     changes/
@@ -87,7 +88,7 @@ Control-issue/
 ## Configuración para nuevo entorno
 
 1. Crear proyecto en [Supabase](https://supabase.com)
-2. Ejecutar las migraciones en el SQL Editor en orden (001 → 013)
+2. Ejecutar las migraciones en el SQL Editor en orden (001 → 014)
 3. Activar Realtime para las tablas: `issues`, `issue_comments`, `remote_sessions`, `devices`, `activity_log`
 4. Copiar `.env.example` a `.env.local` y rellenar:
    - `VITE_SUPABASE_URL`
@@ -106,4 +107,5 @@ Control-issue/
 ## Limitaciones conocidas
 
 - **Dependencia de infraestructura RustDesk**: si `hbbs`/`hbbr` no están alcanzables o faltan puertos (21115/21116/21117), la sesión no puede concretarse aunque la app web esté operativa.
+- **Cliente nativo del técnico**: el camino soportado del MVP depende de que el técnico tenga RustDesk instalado localmente; el web client no forma parte del criterio principal de aceptación.
 - **Notificaciones fuera de la app**: No hay notificaciones push ni por email. El usuario debe tener la app abierta para recibir solicitudes de sesión.
