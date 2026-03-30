@@ -1,4 +1,4 @@
-# Coolify Stack deploy (RustDesk integrado)
+# Coolify Stack deploy (proxy directo recomendado)
 
 Este repo se despliega en Coolify como **Stack** usando `docker-compose.yml`.
 
@@ -7,9 +7,9 @@ Este repo se despliega en Coolify como **Stack** usando `docker-compose.yml`.
 - `app`: build del frontend Vite servido por Nginx
 - `rustdesk-hbbs`: servidor de señalización / registro de IDs
 - `rustdesk-hbbr`: relay de tráfico remoto
-- `cloudflared`: tunnel HTTPS para la app web (`app.tudominio.com`)
+- `cloudflared` (**opcional**, perfil `tunnel`): tunnel legacy; no es la ruta principal de producción para la web
 
-## Variables requeridas en Coolify
+## Variables requeridas en Coolify (stack)
 
 ```env
 VITE_SUPABASE_URL=
@@ -32,6 +32,7 @@ RUSTDESK_RELAY_HOST=
 RUSTDESK_KEY=
 RUSTDESK_ALWAYS_USE_RELAY=N
 
+# Solo si se habilita el perfil "tunnel" en docker compose
 CLOUDFLARE_TUNNEL_TOKEN=
 ```
 
@@ -40,18 +41,25 @@ CLOUDFLARE_TUNNEL_TOKEN=
 1. En Coolify, crea/actualiza un recurso tipo **Stack** desde este repositorio.
 2. Usa el `docker-compose.yml` de raíz.
 3. Carga las variables de entorno del bloque anterior.
-4. Asegurate de abrir puertos en el host:
+4. Configurá el dominio de la app en Coolify como `app.ariancoro.com` (o equivalente en tu entorno).
+5. Asegurate de abrir puertos en el host:
    - `21115/tcp`
    - `21116/tcp`
    - `21116/udp`
    - `21117/tcp`
    - `21118/tcp` (opcional, web client)
    - `21119/tcp` (opcional, web client)
-5. Cloudflare Tunnel: exponer solo la app web (`app.tudominio.com -> http://app:80`).
-6. Para RustDesk, crear DNS directo (sin proxy) apuntando a la IP pública del VPS.
+6. En Cloudflare DNS, apuntá `app` al VPS/Coolify (proxy directo recomendado para la web).
+7. Para RustDesk, crear DNS directo (sin proxy) apuntando a la IP pública del VPS.
 
-> Importante: Cloudflare Tunnel está pensado para HTTP(S) público y TCP privado vía WARP.
-> Para RustDesk self-host (21115-21119), usá DNS directo a la IP del host.
+> Recomendación operativa: la web pública debe salir por el proxy/reverse-proxy de Coolify (dominio gestionado por Coolify).  
+> `cloudflared` queda solo para casos legacy y no debe ser dependencia del deploy productivo.
+
+## CI/CD de producción (master)
+
+- El deploy productivo se dispara automáticamente en cada `push` a `master` desde `.github/workflows/deploy.yml`.
+- El workflow usa la API oficial de Coolify y ejecuta smoke test obligatorio sobre `APP_HEALTHCHECK_URL`.
+- Si Coolify rechaza el trigger o la URL no responde correctamente, el workflow **falla**.
 
 ## Clave RustDesk (importante)
 
