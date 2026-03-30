@@ -93,10 +93,9 @@ export default function InvitePage() {
   }, [loading, navigate, session, token])
 
   useEffect(() => {
-    const inviteToken = token
-    if (!inviteToken || !session) return
+    if (!token || !session) return
 
-    async function loadInvite() {
+    async function loadInvite(inviteToken: string) {
       setInviteLoading(true)
       setError(null)
 
@@ -114,7 +113,7 @@ export default function InvitePage() {
       setInviteLoading(false)
     }
 
-    void loadInvite()
+    void loadInvite(token)
   }, [session, token])
 
   const inviteState = useMemo(
