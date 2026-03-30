@@ -6,6 +6,7 @@ import { useAuth } from '@/features/auth/useAuth'
 import type { Database } from '@/types'
 import { cn } from '@/lib/utils'
 import ActivityFeed from '@/features/admin/ActivityFeed'
+import IssueContributionGraph from './IssueContributionGraph'
 
 type Issue = Database['public']['Tables']['issues']['Row']
 type RemoteSession = Database['public']['Tables']['remote_sessions']['Row']
@@ -97,6 +98,8 @@ export default function DashboardPage() {
           </div>
         ))}
       </div>
+
+      {isAdmin && <IssueContributionGraph />}
 
       <div className="grid gap-6 lg:grid-cols-2">
         {/* Recent issues (task 7.4) */}
