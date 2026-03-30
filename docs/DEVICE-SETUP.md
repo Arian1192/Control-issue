@@ -35,7 +35,7 @@ Si soporte inicia la asistencia desde una incidencia y no encuentra un dispositi
 1. Técnico entra a la incidencia y pulsa **Iniciar asistencia remota**.
 2. Si hace falta, técnico comparte el **enlace de acceso** para registrar el equipo.
 3. Usuario acepta la solicitud en `/remote/:sessionId`.
-4. Usuario descarga RustDesk desde los enlaces sugeridos (Windows/macOS/Linux).
+4. Usuario descarga RustDesk desde los enlaces sugeridos (Windows/macOS/Linux/Android/iOS).
 5. Usuario abre RustDesk y configura (si hace falta):
    - **ID Server** = `VITE_RUSTDESK_ID_SERVER`
    - **Key** = `VITE_RUSTDESK_KEY`
@@ -106,4 +106,6 @@ VITE_RUSTDESK_DOWNLOAD_WINDOWS_URL=
 VITE_RUSTDESK_DOWNLOAD_MAC_INTEL_URL=
 VITE_RUSTDESK_DOWNLOAD_MAC_ARM_URL=
 VITE_RUSTDESK_DOWNLOAD_LINUX_URL=
+VITE_RUSTDESK_DOWNLOAD_ANDROID_URL=
+VITE_RUSTDESK_DOWNLOAD_IOS_URL=
 ```

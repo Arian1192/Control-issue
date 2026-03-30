@@ -11,7 +11,7 @@ import type { SessionStatus } from '@/types'
 const OPEN_STATUSES: SessionStatus[] = ['pendiente', 'aceptada', 'activa']
 const TERMINAL_STATUSES: SessionStatus[] = ['rechazada', 'fallida', 'finalizada', 'cancelada']
 
-type AgentOptionKey = 'windows' | 'macIntel' | 'macArm' | 'linux'
+type AgentOptionKey = 'windows' | 'macIntel' | 'macArm' | 'linux' | 'android' | 'ios'
 
 function getStatusBadgeClasses(status: SessionStatus) {
   switch (status) {
@@ -88,6 +88,8 @@ function detectPreferredAgentKey(): AgentOptionKey | null {
   }
 
   if (platform.includes('linux') || userAgent.includes('linux')) return 'linux'
+  if (platform.includes('android') || userAgent.includes('android')) return 'android'
+  if (platform.includes('iphone') || platform.includes('ipad') || userAgent.includes('iphone') || userAgent.includes('ipad') || userAgent.includes('ipod')) return 'ios'
 
   return null
 }
@@ -102,6 +104,10 @@ function platformLabelFromAgentKey(key: AgentOptionKey | null) {
       return 'macOS Apple Silicon'
     case 'linux':
       return 'Linux'
+    case 'android':
+      return 'Android'
+    case 'ios':
+      return 'iOS'
     default:
       return ''
   }
@@ -203,6 +209,18 @@ export default function RemoteSessionPage() {
       label: 'Linux',
       description: 'Ubuntu / Debian / Fedora y compatibles',
       href: rustdesk.downloads.linux,
+    },
+    {
+      key: 'android',
+      label: 'Android',
+      description: 'Móvil o tablet Android',
+      href: rustdesk.downloads.android,
+    },
+    {
+      key: 'ios',
+      label: 'iPhone / iPad',
+      description: 'iOS / iPadOS (App Store)',
+      href: rustdesk.downloads.ios,
     },
   ] as const
 
@@ -449,7 +467,7 @@ export default function RemoteSessionPage() {
               <input
                 value={rustDeskPlatform}
                 onChange={(event) => setRustDeskPlatform(event.target.value)}
-                placeholder="Windows / macOS / Linux"
+                placeholder="Windows / macOS / Linux / Android / iOS"
                 className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
               />
             </label>
