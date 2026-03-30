@@ -93,13 +93,18 @@ export default function InvitePage() {
   }, [loading, navigate, session, token])
 
   useEffect(() => {
-    if (!token || !session) return
+    const inviteToken = token
+    if (!inviteToken || !session) return
 
     async function loadInvite() {
       setInviteLoading(true)
       setError(null)
 
-      const { data, error } = await supabase.from('device_invites').select('*').eq('token', token).maybeSingle()
+      const { data, error } = await supabase
+        .from('device_invites')
+        .select('*')
+        .eq('token', inviteToken)
+        .maybeSingle()
 
       if (error) {
         setError(error.message)
