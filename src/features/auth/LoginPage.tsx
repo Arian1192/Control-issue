@@ -1,14 +1,24 @@
-import { useState, type FormEvent } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useMemo, useState, type FormEvent } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from './useAuth'
 
 export default function LoginPage() {
   const { signIn } = useAuth()
   const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(false)
+
+  const redirectTo = searchParams.get('redirect') || '/'
+  const loginMessage = useMemo(() => {
+    if (searchParams.get('message') === 'invite') {
+      return 'Iniciá sesión para autorizar la conexión con tu soporte técnico.'
+    }
+
+    return null
+  }, [searchParams])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -19,7 +29,7 @@ export default function LoginPage() {
     if (error) {
       setError('Email o contraseña incorrectos.')
     } else {
-      navigate('/', { replace: true })
+      navigate(redirectTo, { replace: true })
     }
   }
 
@@ -30,6 +40,12 @@ export default function LoginPage() {
           <h1 className="text-2xl font-bold tracking-tight">Control Issue</h1>
           <p className="mt-1 text-sm text-muted-foreground">Inicia sesión para continuar</p>
         </div>
+
+        {loginMessage && (
+          <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+            {loginMessage}
+          </div>
+        )}
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-1">

@@ -42,7 +42,7 @@ CLOUDFLARE_TUNNEL_TOKEN=
 2. Usa el `docker-compose.yml` de raíz.
 3. Carga las variables de entorno del bloque anterior.
 4. Configurá el dominio de la app en Coolify como `app.ariancoro.com` (o equivalente en tu entorno).
-5. Asegurate de abrir puertos en el host:
+5. Asegurate de abrir puertos en el host para RustDesk OSS:
    - `21115/tcp`
    - `21116/tcp`
    - `21116/udp`
@@ -61,6 +61,13 @@ CLOUDFLARE_TUNNEL_TOKEN=
 - El workflow usa la API oficial de Coolify y ejecuta smoke test obligatorio sobre `APP_HEALTHCHECK_URL`.
 - Si Coolify rechaza el trigger o la URL no responde correctamente, el workflow **falla**.
 
+## Alcance operativo del MVP
+
+- Camino principal del técnico: **cliente nativo de RustDesk**
+- Camino principal del usuario: descarga guiada desde la app + carga manual de `ID`/contraseña temporal
+- El web client queda como **opcional**, no como requisito para cerrar la implementación
+- Si el usuario todavía no tiene dispositivo registrado, la app genera un link `/invite/:token` para autorizar el equipo desde el que necesita ayuda
+
 ## Clave RustDesk (importante)
 
 Definí una clave base64 en `RUSTDESK_KEY` y reutilizá ese mismo valor en `VITE_RUSTDESK_KEY`.
@@ -76,6 +83,7 @@ La app no transporta video remoto. La app:
 
 1. crea y coordina la sesión (Supabase),
 2. guía al usuario en instalación/configuración,
-3. entrega al técnico el `ID`/password de RustDesk.
+3. permite fallback con link de acceso para registrar el equipo,
+4. entrega al técnico el `ID`/password de RustDesk.
 
 La conexión remota real ocurre en RustDesk (`hbbs`/`hbbr`).

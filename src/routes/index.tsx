@@ -6,6 +6,7 @@ import LoginPage from '@/features/auth/LoginPage'
 import DashboardPage from '@/features/dashboard/DashboardPage'
 import IssuesListPage from '@/features/issues/IssuesListPage'
 import IssueDetailPage from '@/features/issues/IssueDetailPage'
+import InvitePage from '@/features/invite/InvitePage'
 import DevicesPage from '@/features/remote/DevicesPage'
 import RemoteSessionPage from '@/features/remote/RemoteSessionPage'
 import AdminPage from '@/features/admin/AdminPage'
@@ -14,6 +15,10 @@ export const router = createBrowserRouter([
   {
     path: '/login',
     element: <LoginPage />,
+  },
+  {
+    path: '/invite/:token',
+    element: <InvitePage />,
   },
   {
     element: <ProtectedRoute />,

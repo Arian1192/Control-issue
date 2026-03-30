@@ -13,6 +13,14 @@ Esta guía explica cómo registrar equipos y usar el flujo de asistencia remota 
 
 > Esto solo registra disponibilidad en la app. No instala RustDesk todavía.
 
+### Fallback si el usuario no tiene equipo registrado
+
+Si soporte inicia la asistencia desde una incidencia y no encuentra un dispositivo disponible:
+
+1. Genera un **enlace de acceso** desde la incidencia.
+2. El usuario abre `/invite/:token` en el ordenador a asistir.
+3. La app registra automáticamente ese equipo y lo redirige al flujo remoto.
+
 ---
 
 ## 2) Flujo real de asistencia remota
@@ -25,17 +33,18 @@ Esta guía explica cómo registrar equipos y usar el flujo de asistencia remota 
 ### Paso a paso
 
 1. Técnico entra a la incidencia y pulsa **Iniciar asistencia remota**.
-2. Usuario acepta la solicitud en `/remote/:sessionId`.
-3. Usuario descarga RustDesk desde los enlaces sugeridos (Windows/macOS/Linux).
-4. Usuario abre RustDesk y configura (si hace falta):
+2. Si hace falta, técnico comparte el **enlace de acceso** para registrar el equipo.
+3. Usuario acepta la solicitud en `/remote/:sessionId`.
+4. Usuario descarga RustDesk desde los enlaces sugeridos (Windows/macOS/Linux).
+5. Usuario abre RustDesk y configura (si hace falta):
    - **ID Server** = `VITE_RUSTDESK_ID_SERVER`
    - **Key** = `VITE_RUSTDESK_KEY`
    - **Relay Server** = `VITE_RUSTDESK_RELAY_SERVER` (si está definido)
-5. Usuario copia su **ID de RustDesk** (y contraseña si aplica) en el formulario de la sesión.
-6. Técnico recibe esos datos en tiempo real y abre su cliente RustDesk local.
+6. Usuario copia su **ID de RustDesk** (y contraseña si aplica) en el formulario de la sesión.
+7. Técnico recibe esos datos en tiempo real y abre su cliente RustDesk local.
    - El cliente web es opcional y se usa solo si `VITE_RUSTDESK_WEB_CLIENT_ENABLED=true`.
-7. Técnico pulsa **Marcar sesión en curso** cuando inicia la conexión.
-8. Cualquier parte puede **Finalizar sesión** desde la app.
+8. Técnico pulsa **Marcar sesión en curso** cuando inicia la conexión.
+9. Cualquier parte puede **Finalizar sesión** desde la app.
 
 ---
 
@@ -74,6 +83,12 @@ Sin esos permisos, no hay control remoto completo.
 
 - Revisar conexión Realtime de Supabase en ambos navegadores.
 - Verificar que ambos usuarios tengan sesión autenticada activa.
+
+### El usuario no tiene dispositivos o están todos offline
+
+- Desde la incidencia, usar **Generar enlace de acceso**.
+- Pedir al usuario que abra ese link en el ordenador correcto.
+- Tras autorizar, la app registra el equipo y continúa el flujo remoto.
 
 ---
 

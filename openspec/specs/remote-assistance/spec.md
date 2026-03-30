@@ -20,7 +20,11 @@ Un técnico o admin SHALL poder solicitar una sesión de asistencia remota a un 
 
 #### Scenario: Solicitud a dispositivo offline
 - **WHEN** el técnico intenta iniciar una sesión sobre un dispositivo `is_online = false`
-- **THEN** el sistema muestra aviso y no crea sesión
+- **THEN** el sistema muestra un recovery path claro y permite generar un link `/invite/:token` para que el usuario autorice el equipo desde el que necesita ayuda
+
+#### Scenario: Solicitud sin dispositivos registrados
+- **WHEN** el técnico intenta iniciar asistencia y el usuario no tiene dispositivos
+- **THEN** el sistema permite generar un link `/invite/:token` asociado a la incidencia para registrar el equipo y continuar el flujo remoto
 
 ### Requirement: Una sola sesión abierta por dispositivo
 El sistema SHALL impedir más de una sesión abierta por dispositivo (`pendiente`, `aceptada`, `activa`).
@@ -34,7 +38,7 @@ El propietario del dispositivo SHALL poder aceptar o rechazar la solicitud.
 
 #### Scenario: Propietario acepta
 - **WHEN** el propietario pulsa "Aceptar"
-- **THEN** el sistema actualiza estado a `aceptada`, define `accepted_at` y pasa `connection_phase` a preparación de agente
+- **THEN** el sistema actualiza estado a `aceptada`, define `accepted_at` y pasa `connection_phase='awaiting-rustdesk-install'`
 
 #### Scenario: Propietario rechaza
 - **WHEN** el propietario pulsa "Rechazar"
@@ -49,14 +53,14 @@ La app SHALL coordinar el handoff hacia RustDesk sin transportar directamente el
 
 #### Scenario: Técnico recibe datos en tiempo real
 - **WHEN** el usuario publica sus datos de RustDesk
-- **THEN** el técnico ve esos datos en `/remote/:sessionId` sin recargar y puede copiarlos para conectar
+- **THEN** el técnico ve esos datos en `/remote/:sessionId` sin recargar, el sistema guarda `connection_phase='ready-for-technician'` y el técnico puede copiarlos para conectar
 
 ### Requirement: Inicio de sesión en curso por técnico
 El técnico SHALL poder marcar la sesión como activa cuando inicia la conexión en RustDesk.
 
 #### Scenario: Marcar sesión en curso
 - **WHEN** el técnico pulsa "Marcar sesión en curso" con `rustdesk_id` presente
-- **THEN** el sistema actualiza estado a `activa`, define `started_at` y `connection_phase='connected'`
+- **THEN** el sistema actualiza estado a `activa`, define `started_at` y `connection_phase='active'`
 
 ### Requirement: Notificación in-app de sesión pendiente
 El sistema SHALL notificar en tiempo real al propietario del dispositivo cuando se crea una sesión `pendiente` dirigida a uno de sus dispositivos.
@@ -72,9 +76,13 @@ Cualquiera de las partes SHALL poder finalizar la sesión en cualquier momento.
 - **WHEN** técnico o usuario pulsa "Finalizar sesión"
 - **THEN** el sistema actualiza estado a `finalizada`, registra `ended_at` y limpia credenciales sensibles temporales (`rustdesk_password`)
 
-### Requirement: Iniciar sesión remota con invite vinculado
-Un admin-it SHALL poder generar un invite que, al aceptarse, vincule automáticamente el dispositivo a la sesión remota pre-creada.
+### Requirement: Iniciar asistencia remota con invite vinculado
+Un admin-it o technician SHALL poder generar un invite que permita registrar el equipo y continuar la asistencia remota desde una incidencia.
 
-#### Scenario: Sesión iniciada tras aceptar invite
+#### Scenario: Invite con sesión remota ya asociada
 - **WHEN** el invite incluye `session_id` y el usuario lo acepta
 - **THEN** la app asocia el nuevo dispositivo a esa sesión y redirige a `/remote/:session_id`
+
+#### Scenario: Invite vinculado a incidencia sin dispositivo previo
+- **WHEN** el invite incluye `issue_id` y el usuario autoriza el equipo
+- **THEN** la app registra el dispositivo, crea o recupera la `remote_session` correspondiente y redirige a `/remote/:sessionId`

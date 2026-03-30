@@ -36,6 +36,27 @@ function getStatusLabel(status: SessionStatus) {
   return status === 'aceptada' ? 'aceptada / preparando conexión' : status
 }
 
+function getConnectionPhaseLabel(phase: string) {
+  switch (phase) {
+    case 'awaiting-user-acceptance':
+      return 'Esperando aceptación del usuario'
+    case 'awaiting-rustdesk-install':
+      return 'Esperando instalación / apertura de RustDesk'
+    case 'awaiting-rustdesk-credentials':
+      return 'Esperando credenciales de RustDesk'
+    case 'ready-for-technician':
+      return 'Lista para el técnico'
+    case 'active':
+      return 'Sesión en curso'
+    case 'closing':
+      return 'Cerrando sesión'
+    case 'failed':
+      return 'Sesión fallida'
+    default:
+      return phase
+  }
+}
+
 function detectPreferredAgentKey(): AgentOptionKey | null {
   if (typeof window === 'undefined') return null
 
@@ -260,6 +281,21 @@ export default function RemoteSessionPage() {
         </span>
       </div>
 
+      <div className="grid gap-3 rounded-lg border bg-card p-4 text-sm md:grid-cols-3">
+        <div>
+          <p className="text-xs text-muted-foreground">Fase actual</p>
+          <p className="font-medium">{getConnectionPhaseLabel(session.connection_phase)}</p>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">Solicitud creada</p>
+          <p className="font-medium">{new Date(session.created_at).toLocaleString('es-ES')}</p>
+        </div>
+        <div>
+          <p className="text-xs text-muted-foreground">Aceptada</p>
+          <p className="font-medium">{session.accepted_at ? new Date(session.accepted_at).toLocaleString('es-ES') : 'Pendiente'}</p>
+        </div>
+      </div>
+
       {rustdesk.usingPublicNetwork ? (
         <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-xs text-blue-900">
           Modo contingencia activo: usá RustDesk en su red pública (sin configurar ID Server/Relay/Key).
@@ -317,9 +353,9 @@ export default function RemoteSessionPage() {
       {isSharer && isAccepted && (
         <div className="space-y-6 rounded-lg border bg-card p-6">
           <div className="text-center">
-            <h2 className="text-base font-semibold">Instalá y abrí RustDesk</h2>
+            <h2 className="text-base font-semibold">Instalá, abrí RustDesk y compartí tu ID</h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Descargá RustDesk, abrilo y compartí tu ID para que el técnico te asista.
+              Hacelo en este orden: descargá RustDesk, abrilo con la configuración indicada y pegá tu ID acá abajo.
             </p>
           </div>
 
@@ -362,7 +398,8 @@ export default function RemoteSessionPage() {
               <div className="mt-2 space-y-1 text-xs">
                 <p>1) Abrí RustDesk recién instalado.</p>
                 <p>2) No configures servidor privado.</p>
-                <p>3) Copiá tu ID y pegalo acá.</p>
+                <p>3) Copiá tu ID y, si aparece, tu contraseña temporal.</p>
+                <p>4) Pegalos acá y enviá los datos al técnico.</p>
               </div>
             </div>
           ) : (
@@ -378,6 +415,9 @@ export default function RemoteSessionPage() {
                 </p>
                 <p>
                   Key: <strong className="break-all text-foreground">{rustdesk.key || '—'}</strong>
+                </p>
+                <p className="pt-1">
+                  Después de configurarlo, copiá tu ID y pegalo acá para avisarle al técnico que ya puede conectarse.
                 </p>
               </div>
             </div>
@@ -462,7 +502,9 @@ export default function RemoteSessionPage() {
       {isViewer && isAccepted && (
         <div className="space-y-4 rounded-lg border bg-card p-6">
           <p className="text-sm text-muted-foreground text-center">
-            El usuario aceptó la sesión. Esperá a que comparta su ID de RustDesk o pedile que lo cargue desde este panel.
+            {session.rustdesk_id
+              ? 'El usuario ya compartió sus datos de RustDesk. Abrí tu cliente nativo, conectate y luego marcá la sesión en curso.'
+              : 'El usuario aceptó la sesión. Esperá a que comparta su ID de RustDesk o pedile que lo cargue desde este panel.'}
           </p>
 
           {session.rustdesk_id ? (
@@ -518,30 +560,6 @@ export default function RemoteSessionPage() {
           )}
 
           <div className="flex flex-wrap items-center justify-center gap-3">
-            {rustdesk.sessionWebClientUrl && (
-              <a
-                href={rustdesk.sessionWebClientUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm hover:bg-accent"
-              >
-                <ExternalLink className="h-4 w-4" />
-                Abrir cliente web RustDesk
-              </a>
-            )}
-
-            {rustdesk.webClientUrl && !rustdesk.sessionWebClientUrl && (
-              <a
-                href={rustdesk.webClientUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm hover:bg-accent"
-              >
-                <ExternalLink className="h-4 w-4" />
-                Abrir RustDesk web
-              </a>
-            )}
-
             <button
               onClick={() => void startAsViewer()}
               disabled={!session.rustdesk_id}
@@ -549,45 +567,46 @@ export default function RemoteSessionPage() {
             >
               Marcar sesión en curso
             </button>
+
+            {(rustdesk.sessionWebClientUrl || rustdesk.webClientUrl) && (
+              <a
+                href={rustdesk.sessionWebClientUrl || rustdesk.webClientUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm hover:bg-accent"
+              >
+                <ExternalLink className="h-4 w-4" />
+                Abrir web client (opcional)
+              </a>
+            )}
           </div>
         </div>
       )}
 
       {isViewer && isActive && (
         <div className="space-y-4 rounded-lg border bg-card p-6 text-center">
-          {rustdesk.sessionWebClientUrl ? (
+          <div className="space-y-2 text-sm text-muted-foreground">
+            <p>Abrí tu cliente RustDesk local y conectate usando el ID del usuario.</p>
+            {session.rustdesk_id && (
+              <button
+                onClick={() => void copyToClipboard('datos completos de RustDesk', rustdesk.nativeSessionSummary)}
+                className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-background"
+              >
+                <Copy className="h-3.5 w-3.5" />
+                Copiar datos de conexión
+              </button>
+            )}
+          </div>
+          {(rustdesk.sessionWebClientUrl || rustdesk.webClientUrl) && (
             <a
-              href={rustdesk.sessionWebClientUrl}
+              href={rustdesk.sessionWebClientUrl || rustdesk.webClientUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-md bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
+              className="inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm hover:bg-accent"
             >
               <ExternalLink className="h-4 w-4" />
-              Abrir conexión RustDesk
+              Abrir web client (opcional)
             </a>
-          ) : rustdesk.webClientUrl ? (
-            <a
-              href={rustdesk.webClientUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-md bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90"
-            >
-              <ExternalLink className="h-4 w-4" />
-              Abrir RustDesk web
-            </a>
-          ) : (
-            <div className="space-y-2 text-sm text-muted-foreground">
-              <p>Abrí tu cliente RustDesk local y conectate usando el ID del usuario.</p>
-              {session.rustdesk_id && (
-                <button
-                  onClick={() => void copyToClipboard('datos completos de RustDesk', rustdesk.nativeSessionSummary)}
-                  className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-background"
-                >
-                  <Copy className="h-3.5 w-3.5" />
-                  Copiar datos de conexión
-                </button>
-              )}
-            </div>
           )}
           <p className="text-xs text-muted-foreground">
             Control Issue coordina la sesión y RustDesk ejecuta la conexión remota.
