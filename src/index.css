@@ -57,3 +57,23 @@
     @apply bg-background text-foreground;
   }
 }
+
+@layer utilities {
+  .contribution-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border)) transparent;
+  }
+
+  .contribution-scroll::-webkit-scrollbar {
+    height: 6px;
+  }
+
+  .contribution-scroll::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .contribution-scroll::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--border));
+    border-radius: 9999px;
+  }
+}

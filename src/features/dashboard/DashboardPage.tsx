@@ -6,7 +6,7 @@ import { useAuth } from '@/features/auth/useAuth'
 import type { Database } from '@/types'
 import { cn } from '@/lib/utils'
 import ActivityFeed from '@/features/admin/ActivityFeed'
-import IssueContributionGraph from './IssueContributionGraph'
+import IssueContributionGraph from '@/features/dashboard/IssueContributionGraph.tsx'
 
 type Issue = Database['public']['Tables']['issues']['Row']
 type RemoteSession = Database['public']['Tables']['remote_sessions']['Row']

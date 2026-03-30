@@ -33,20 +33,20 @@ function renderSkeleton(): ReactNode {
   return (
     <div className="space-y-4">
       <div className="h-4 w-48 animate-pulse rounded bg-muted" />
-      <div className="overflow-x-auto">
-        <div className="inline-flex min-w-max gap-2">
+      <div className="contribution-scroll overflow-x-auto pb-1">
+        <div className="inline-flex min-w-max gap-2 md:min-w-0 md:w-full md:justify-center">
           <div className="grid grid-rows-7 gap-1 pt-5">
             {Array.from({ length: 7 }).map((_, index) => (
               <div key={index} className="h-3 w-3 rounded bg-transparent" />
             ))}
           </div>
           <div className="space-y-2">
-            <div className="flex gap-1">
+            <div className="flex gap-1 md:gap-0.5">
               {Array.from({ length: 12 }).map((_, index) => (
                 <div key={index} className="h-3 w-6 animate-pulse rounded bg-muted" />
               ))}
             </div>
-            <div className="flex gap-1">
+            <div className="flex gap-1 md:gap-0.5">
               {Array.from({ length: 53 }).map((_, columnIndex) => (
                 <div key={columnIndex} className="grid grid-rows-7 gap-1">
                   {Array.from({ length: 7 }).map((_, rowIndex) => (
@@ -106,8 +106,8 @@ export default function IssueContributionGraph() {
 
         {!loading && !error && (
           <>
-            <div className="overflow-x-auto pb-1">
-              <div className="inline-flex min-w-max gap-2 rounded-lg border border-dashed border-border/80 bg-muted/10 p-3">
+            <div className="contribution-scroll overflow-x-auto pb-1">
+              <div className="inline-flex min-w-max gap-2 rounded-lg border border-dashed border-border/80 bg-muted/10 p-3 md:min-w-0 md:w-full md:justify-center">
                 <div className="grid grid-rows-7 gap-1 pt-5 text-[10px] font-medium text-muted-foreground">
                   {ISSUE_CONTRIBUTION_DAY_LABELS.map((label, index) => (
                     <div key={`${label}-${index}`} className="flex h-3 w-3 items-center justify-center">
@@ -117,11 +117,11 @@ export default function IssueContributionGraph() {
                 </div>
 
                 <div className="space-y-2">
-                  <div className="flex gap-1 pl-px">
+                  <div className="flex h-3 gap-1 pl-px pr-1 md:h-2.5 md:gap-0.5">
                     {weeks.map((week, index) => (
-                      <div key={`month-${index}`} className="relative w-3">
+                      <div key={`month-${index}`} className="w-3 md:w-2.5">
                         {week.monthLabel && (
-                          <span className="absolute left-0 top-0 whitespace-nowrap text-[10px] font-medium uppercase tracking-wide text-muted-foreground/80">
+                          <span className="block whitespace-nowrap text-[10px] font-medium uppercase tracking-wide text-muted-foreground/80">
                             {week.monthLabel}
                           </span>
                         )}
@@ -129,12 +129,12 @@ export default function IssueContributionGraph() {
                     ))}
                   </div>
 
-                  <div className="flex gap-1">
+                  <div className="flex gap-1 md:gap-0.5">
                     {weeks.map((week, weekIndex) => (
                       <div key={`week-${weekIndex}`} className="grid grid-rows-7 gap-1">
                         {week.days.map((day, dayIndex) => {
                           if (!day) {
-                            return <div key={`empty-${dayIndex}`} className="h-3 w-3 rounded-sm opacity-0" />
+                            return <div key={`empty-${dayIndex}`} className="h-3 w-3 rounded-sm opacity-0 md:h-2.5 md:w-2.5" />
                           }
 
                           const tooltip = formatTooltip(day)
@@ -145,7 +145,7 @@ export default function IssueContributionGraph() {
                               title={tooltip}
                               aria-label={tooltip}
                               className={cn(
-                                'h-3 w-3 rounded-[3px] border transition-transform hover:scale-110',
+                                'h-3 w-3 rounded-[3px] border transition-transform hover:scale-110 md:h-2.5 md:w-2.5',
                                 LEVEL_STYLES[day.level],
                                 day.isToday && 'ring-1 ring-primary/50 ring-offset-1 ring-offset-background'
                               )}
