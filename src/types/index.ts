@@ -10,6 +10,7 @@ export type {
 export type SessionConnectionPhase =
   | 'awaiting-user-acceptance'
   | 'awaiting-rustdesk-install'
+  | 'awaiting-otp'
   | 'awaiting-rustdesk-credentials'
   | 'ready-for-technician'
   | 'active'

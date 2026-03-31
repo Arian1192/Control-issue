@@ -8,8 +8,14 @@ import { cn } from '@/lib/utils'
 
 type Issue = Database['public']['Tables']['issues']['Row']
 type Comment = Database['public']['Tables']['issue_comments']['Row']
-type Device = Database['public']['Tables']['devices']['Row']
+type DeviceRow = Database['public']['Tables']['devices']['Row']
+type Device = Pick<
+  DeviceRow,
+  'id' | 'name' | 'owner_id' | 'is_online' | 'last_seen' | 'ip_local' | 'created_at' | 'rustdesk_id'
+>
 type Assignee = { id: string; name: string; role: string }
+
+const DEVICE_SELECT_FIELDS = 'id, name, owner_id, is_online, last_seen, ip_local, created_at, rustdesk_id'
 
 const STATUS_OPTIONS: IssueStatus[] = ['abierto', 'en-progreso', 'resuelto', 'cerrado']
 const MAX_FILE_BYTES = 5 * 1024 * 1024 // 5 MB
@@ -74,10 +80,10 @@ export default function IssueDetailPage() {
     async function loadDevices() {
       const { data } = await supabase
         .from('devices')
-        .select('*')
+        .select(DEVICE_SELECT_FIELDS)
         .eq('owner_id', ownerId)
 
-      setDevices(data ?? [])
+      setDevices((data as Device[] | null) ?? [])
       if (data?.length) {
         setSelectedDevice((current) =>
           current && data.some((device) => device.id === current) ? current : data[0].id
@@ -373,7 +379,7 @@ export default function IssueDetailPage() {
                 >
                   {devices.map((d) => (
                     <option key={d.id} value={d.id}>
-                      {d.name} {d.is_online ? '🟢' : '🔴'}
+                      {d.name} {d.is_online ? '🟢' : '🔴'} {d.rustdesk_id ? '· agente listo' : '· sin agente'}
                     </option>
                   ))}
                 </select>
@@ -401,7 +407,9 @@ export default function IssueDetailPage() {
 
               {selectedDeviceRow?.is_online ? (
                 <p className="text-xs text-muted-foreground">
-                  El dispositivo está disponible. Al iniciar, la app abrirá o recuperará la sesión remota actual.
+                  {selectedDeviceRow.rustdesk_id
+                    ? 'El dispositivo está disponible y ya tiene agente. Al iniciar, la app abrirá o recuperará la sesión remota actual.'
+                    : 'El dispositivo está disponible pero todavía no tiene agente. Podés iniciar la sesión ahora y después generar el enrollment desde la pantalla remota.'}
                 </p>
               ) : hasOnlineDevices ? (
                 <p className="text-xs text-muted-foreground">

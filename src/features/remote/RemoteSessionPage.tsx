@@ -1,17 +1,15 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import { Check, Copy, ExternalLink, XCircle } from 'lucide-react'
 import { useAuth } from '@/features/auth/useAuth'
 import { useRemoteSession } from './useRemoteSession'
 import { SessionChat } from './SessionChat'
-import { supabase } from '@/lib/supabaseClient'
+import { buildEnrollmentCommands, callEnrollmentTokenGenerate } from '@/lib/enrollment'
 import { cn } from '@/lib/utils'
 import type { SessionStatus } from '@/types'
 
 const OPEN_STATUSES: SessionStatus[] = ['pendiente', 'aceptada', 'activa']
 const TERMINAL_STATUSES: SessionStatus[] = ['rechazada', 'fallida', 'finalizada', 'cancelada']
-
-type AgentOptionKey = 'windows' | 'macIntel' | 'macArm' | 'linux' | 'android' | 'ios'
 
 function getStatusBadgeClasses(status: SessionStatus) {
   switch (status) {
@@ -41,7 +39,9 @@ function getConnectionPhaseLabel(phase: string) {
     case 'awaiting-user-acceptance':
       return 'Esperando aceptación del usuario'
     case 'awaiting-rustdesk-install':
-      return 'Esperando instalación / apertura de RustDesk'
+      return 'Esperando instalación del agente'
+    case 'awaiting-otp':
+      return 'Esperando OTP automática del agente'
     case 'awaiting-rustdesk-credentials':
       return 'Esperando credenciales de RustDesk'
     case 'ready-for-technician':
@@ -57,97 +57,30 @@ function getConnectionPhaseLabel(phase: string) {
   }
 }
 
-function detectPreferredAgentKey(): AgentOptionKey | null {
-  if (typeof window === 'undefined') return null
-
-  const navigatorWithUAData = navigator as Navigator & {
-    userAgentData?: { platform?: string; architecture?: string }
-  }
-
-  const platform = (navigatorWithUAData.userAgentData?.platform ?? navigator.platform ?? '').toLowerCase()
-  const architecture = (navigatorWithUAData.userAgentData?.architecture ?? '').toLowerCase()
-  const userAgent = navigator.userAgent.toLowerCase()
-
-  if (platform.includes('win') || userAgent.includes('windows')) return 'windows'
-
-  if (platform.includes('mac') || userAgent.includes('mac os x')) {
-    if (architecture.includes('arm') || userAgent.includes('arm64') || userAgent.includes('aarch64')) {
-      return 'macArm'
-    }
-
-    if (
-      architecture.includes('x86') ||
-      architecture.includes('intel') ||
-      userAgent.includes('x86_64') ||
-      userAgent.includes('intel')
-    ) {
-      return 'macIntel'
-    }
-
-    return 'macArm'
-  }
-
-  if (platform.includes('linux') || userAgent.includes('linux')) return 'linux'
-  if (platform.includes('android') || userAgent.includes('android')) return 'android'
-  if (platform.includes('iphone') || platform.includes('ipad') || userAgent.includes('iphone') || userAgent.includes('ipad') || userAgent.includes('ipod')) return 'ios'
-
-  return null
-}
-
-function platformLabelFromAgentKey(key: AgentOptionKey | null) {
-  switch (key) {
-    case 'windows':
-      return 'Windows'
-    case 'macIntel':
-      return 'macOS Intel'
-    case 'macArm':
-      return 'macOS Apple Silicon'
-    case 'linux':
-      return 'Linux'
-    case 'android':
-      return 'Android'
-    case 'ios':
-      return 'iOS'
-    default:
-      return ''
-  }
-}
-
 export default function RemoteSessionPage() {
   const { sessionId } = useParams<{ sessionId: string }>()
   const { profile } = useAuth()
   const navigate = useNavigate()
-  const [deviceOwnerId, setDeviceOwnerId] = useState<string | null>(null)
-  const [savingRustDesk, setSavingRustDesk] = useState(false)
+  const [uiError, setUiError] = useState<string | null>(null)
+  const [generatingEnrollment, setGeneratingEnrollment] = useState(false)
+  const [enrollmentCommands, setEnrollmentCommands] = useState<ReturnType<
+    typeof buildEnrollmentCommands
+  > | null>(null)
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null)
-  const [rustDeskIdInput, setRustDeskIdInput] = useState('')
-  const [rustDeskPasswordInput, setRustDeskPasswordInput] = useState('')
-  const [rustDeskPlatform, setRustDeskPlatform] = useState('')
 
   const {
+    device,
     session,
     error,
     rustdesk,
     startAsSharer,
-    publishRustDeskConnection,
     startAsViewer,
     rejectSession,
     cancelSession,
     endSession,
   } = useRemoteSession(sessionId ?? null, profile?.id ?? null)
 
-  useEffect(() => {
-    if (!session?.target_device_id) return
-
-    supabase
-      .from('devices')
-      .select('owner_id')
-      .eq('id', session.target_device_id)
-      .single()
-      .then(({ data }) => setDeviceOwnerId(data?.owner_id ?? null))
-  }, [session?.target_device_id])
-
-  const isSharer = !!deviceOwnerId && deviceOwnerId === profile?.id
+  const isSharer = !!device?.owner_id && device.owner_id === profile?.id
   const isViewer = session?.initiated_by === profile?.id
 
   const sessionStatus = session?.status
@@ -157,106 +90,51 @@ export default function RemoteSessionPage() {
   const isAccepted = sessionStatus === 'aceptada'
   const isActive = sessionStatus === 'activa'
   const canViewerCancel = isViewer && (isPending || isAccepted)
-
-  const preferredAgentKey = useMemo(() => detectPreferredAgentKey(), [])
-  const preferredPlatformLabel = useMemo(() => platformLabelFromAgentKey(preferredAgentKey), [preferredAgentKey])
-
-  useEffect(() => {
-    if (!session || !isAccepted || !isSharer) return
-
-    setRustDeskIdInput(session.rustdesk_id ?? '')
-    setRustDeskPasswordInput(session.rustdesk_password ?? '')
-
-    if (session.rustdesk_platform) {
-      setRustDeskPlatform(session.rustdesk_platform)
-      return
-    }
-
-    if (preferredPlatformLabel) {
-      setRustDeskPlatform(preferredPlatformLabel)
-    }
-  }, [
-    isAccepted,
-    isSharer,
-    preferredPlatformLabel,
-    session,
-    session?.rustdesk_id,
-    session?.rustdesk_password,
-    session?.rustdesk_platform,
-  ])
-
-  const agentOptions = [
-    {
-      key: 'windows',
-      label: 'Windows',
-      description: 'PC con Windows 64-bit',
-      href: rustdesk.downloads.windows,
-    },
-    {
-      key: 'macIntel',
-      label: 'Mac Intel',
-      description: 'Mac con procesador Intel',
-      href: rustdesk.downloads.macIntel,
-    },
-    {
-      key: 'macArm',
-      label: 'Mac Apple Silicon',
-      description: 'Mac M1/M2/M3/M4',
-      href: rustdesk.downloads.macArm,
-    },
-    {
-      key: 'linux',
-      label: 'Linux',
-      description: 'Ubuntu / Debian / Fedora y compatibles',
-      href: rustdesk.downloads.linux,
-    },
-    {
-      key: 'android',
-      label: 'Android',
-      description: 'Móvil o tablet Android',
-      href: rustdesk.downloads.android,
-    },
-    {
-      key: 'ios',
-      label: 'iPhone / iPad',
-      description: 'iOS / iPadOS (App Store)',
-      href: rustdesk.downloads.ios,
-    },
-  ] as const
-
-  const availableAgentOptions = agentOptions.filter((option) => !!option.href)
+  const isDeviceEnrolled = !!device?.rustdesk_id
+  const hasOtp = !!session?.otp
 
   async function handleAccept() {
+    setUiError(null)
     await startAsSharer()
   }
 
   async function handleReject() {
+    setUiError(null)
     await rejectSession()
     navigate(-1)
   }
 
   async function handleViewerCancel() {
+    setUiError(null)
     await cancelSession()
     navigate(-1)
   }
 
   async function handleEndSession() {
+    setUiError(null)
     await endSession('finalizada')
   }
 
-  async function handlePublishRustDesk() {
-    setSavingRustDesk(true)
-    const success = await publishRustDeskConnection({
-      rustdeskId: rustDeskIdInput,
-      rustdeskPassword: rustDeskPasswordInput,
-      platform: rustDeskPlatform || null,
-    })
-
-    if (success) {
-      setCopyFeedback('Datos de conexión enviados al técnico.')
+  async function handleGenerateEnrollment() {
+    if (!device?.id) {
+      setUiError('No encontramos el dispositivo de esta sesión.')
+      return
     }
 
-    setSavingRustDesk(false)
+    setGeneratingEnrollment(true)
+    setUiError(null)
+    setCopyFeedback(null)
+
+    const { token, error: enrollmentError } = await callEnrollmentTokenGenerate(device.id)
+    if (enrollmentError || !token) {
+      setUiError(enrollmentError ?? 'No se pudo generar el token de enrollment.')
+      setGeneratingEnrollment(false)
+      return
+    }
+
+    setEnrollmentCommands(buildEnrollmentCommands(device.id, token))
+    setCopyFeedback('Token generado. Compartile al usuario el comando que corresponda a su equipo.')
+    setGeneratingEnrollment(false)
   }
 
   async function copyToClipboard(label: string, value?: string | null) {
@@ -273,6 +151,8 @@ export default function RemoteSessionPage() {
   if (!session) {
     return <div className="py-8 text-center text-sm text-muted-foreground">Cargando sesión…</div>
   }
+
+  const combinedError = uiError ?? error
 
   return (
     <div className="mx-auto max-w-4xl space-y-4">
@@ -305,6 +185,10 @@ export default function RemoteSessionPage() {
           <p className="font-medium">{getConnectionPhaseLabel(session.connection_phase)}</p>
         </div>
         <div>
+          <p className="text-xs text-muted-foreground">Dispositivo</p>
+          <p className="font-medium">{device?.name ?? 'Cargando…'}</p>
+        </div>
+        <div>
           <p className="text-xs text-muted-foreground">Solicitud creada</p>
           <p className="font-medium">{new Date(session.created_at).toLocaleString('es-ES')}</p>
         </div>
@@ -328,9 +212,9 @@ export default function RemoteSessionPage() {
         )
       )}
 
-      {error && (
+      {combinedError && (
         <div className="rounded-md bg-destructive/10 px-4 py-3 text-sm text-destructive">
-          {error}
+          {combinedError}
         </div>
       )}
 
@@ -371,122 +255,57 @@ export default function RemoteSessionPage() {
       {isSharer && isAccepted && (
         <div className="space-y-6 rounded-lg border bg-card p-6">
           <div className="text-center">
-            <h2 className="text-base font-semibold">Instalá, abrí RustDesk y compartí tu ID</h2>
+            <h2 className="text-base font-semibold">
+              {isDeviceEnrolled ? 'Tu equipo ya está preparado' : 'Falta instalar el agente de asistencia'}
+            </h2>
             <p className="mt-1 text-sm text-muted-foreground">
-              Hacelo en este orden: descargá RustDesk, abrilo con la configuración indicada y pegá tu ID acá abajo.
+              {isDeviceEnrolled
+                ? 'No hace falta que copies nada manualmente. El agente genera la OTP y se la pasa al técnico automáticamente.'
+                : 'Este dispositivo todavía no tiene el agente instalado. Soporte te va a compartir el comando de instalación para dejarlo listo.'}
             </p>
           </div>
 
-          {availableAgentOptions.length > 0 ? (
-            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
-              {availableAgentOptions.map((option) => {
-                const isRecommended = preferredAgentKey === option.key
-                return (
-                  <a
-                    key={option.key}
-                    href={option.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className={cn(
-                      'rounded-md border px-3 py-3 text-left text-sm transition-colors hover:bg-accent',
-                      isRecommended && 'border-primary ring-1 ring-primary'
-                    )}
-                  >
-                    <span className="inline-flex items-center gap-1 font-medium">
-                      <ExternalLink className="h-4 w-4" />
-                      {option.label}
-                    </span>
-                    <p className="mt-1 text-xs text-muted-foreground">{option.description}</p>
-                    {isRecommended && (
-                      <p className="mt-2 text-[11px] font-medium text-primary">Recomendado para este equipo</p>
-                    )}
-                  </a>
-                )
-              })}
+          {isDeviceEnrolled ? (
+            <div className="space-y-4">
+              <div className="rounded-lg border bg-muted/30 p-4 text-sm">
+                <p className="font-medium">Estado del agente</p>
+                <div className="mt-2 space-y-1 text-xs text-muted-foreground">
+                  <p>
+                    ID de RustDesk registrado:{' '}
+                    <strong className="text-foreground">{device?.rustdesk_id ?? '—'}</strong>
+                  </p>
+                  <p>
+                    OTP automática:{' '}
+                    <strong className="text-foreground">
+                      {session.otp ? 'ya generada' : 'pendiente, esperá unos segundos'}
+                    </strong>
+                  </p>
+                  {session.otp_expires_at && (
+                    <p>
+                      Vence:{' '}
+                      <strong className="text-foreground">
+                        {new Date(session.otp_expires_at).toLocaleString('es-ES')}
+                      </strong>
+                    </p>
+                  )}
+                </div>
+              </div>
+
+              {session.otp ? (
+                <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
+                  <Check className="h-4 w-4" />
+                  Listo: soporte ya recibió el código de acceso y puede conectarse.
+                </div>
+              ) : (
+                <div className="rounded-md border border-blue-200 bg-blue-50 px-4 py-3 text-sm text-blue-900">
+                  Estamos esperando que el agente del equipo genere la OTP. Dejá esta pantalla abierta.
+                </div>
+              )}
             </div>
           ) : (
-            <p className="text-center text-sm text-muted-foreground">
-              No hay enlaces de descarga configurados para este entorno.
-            </p>
-          )}
-
-          {rustdesk.usingPublicNetwork ? (
-            <div className="rounded-lg border border-blue-200 bg-blue-50 p-4 text-sm text-blue-900">
-              <p className="font-medium">Configuración recomendada (rápida)</p>
-              <div className="mt-2 space-y-1 text-xs">
-                <p>1) Abrí RustDesk recién instalado.</p>
-                <p>2) No configures servidor privado.</p>
-                <p>3) Copiá tu ID y, si aparece, tu contraseña temporal.</p>
-                <p>4) Pegalos acá y enviá los datos al técnico.</p>
-              </div>
-            </div>
-          ) : (
-            <div className="rounded-lg border bg-muted/30 p-4 text-sm">
-              <p className="font-medium">Configuración del servidor RustDesk</p>
-              <div className="mt-2 space-y-1 text-xs text-muted-foreground">
-                <p>
-                  ID Server: <strong className="text-foreground">{rustdesk.idServer || '—'}</strong>
-                </p>
-                <p>
-                  Relay Server:{' '}
-                  <strong className="text-foreground">{rustdesk.relayServer || '(auto)'}</strong>
-                </p>
-                <p>
-                  Key: <strong className="break-all text-foreground">{rustdesk.key || '—'}</strong>
-                </p>
-                <p className="pt-1">
-                  Después de configurarlo, copiá tu ID y pegalo acá para avisarle al técnico que ya puede conectarse.
-                </p>
-              </div>
-            </div>
-          )}
-
-          <div className="grid gap-3 rounded-lg border p-4 md:grid-cols-2">
-            <label className="space-y-1 text-left text-sm">
-              <span className="text-xs text-muted-foreground">Tu ID de RustDesk</span>
-              <input
-                value={rustDeskIdInput}
-                onChange={(event) => setRustDeskIdInput(event.target.value)}
-                placeholder="Ej: 123 456 789"
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              />
-            </label>
-
-            <label className="space-y-1 text-left text-sm">
-              <span className="text-xs text-muted-foreground">Contraseña temporal (opcional)</span>
-              <input
-                value={rustDeskPasswordInput}
-                onChange={(event) => setRustDeskPasswordInput(event.target.value)}
-                placeholder="Si RustDesk te muestra una"
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              />
-            </label>
-
-            <label className="space-y-1 text-left text-sm md:col-span-2">
-              <span className="text-xs text-muted-foreground">Sistema operativo</span>
-              <input
-                value={rustDeskPlatform}
-                onChange={(event) => setRustDeskPlatform(event.target.value)}
-                placeholder="Windows / macOS / Linux / Android / iOS"
-                className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
-              />
-            </label>
-
-            <div className="md:col-span-2">
-              <button
-                onClick={handlePublishRustDesk}
-                disabled={savingRustDesk || !rustDeskIdInput.trim()}
-                className="w-full rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                {savingRustDesk ? 'Guardando…' : 'Enviar datos al técnico'}
-              </button>
-            </div>
-          </div>
-
-          {session.rustdesk_ready_at && (
-            <div className="flex items-center gap-2 rounded-md border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-800">
-              <Check className="h-4 w-4" />
-              Listo: el técnico ya puede iniciar la conexión con tu equipo.
+            <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-900">
+              Soporte necesita ejecutar el script de enrollment una sola vez en este equipo. Apenas termine, la sesión
+              pasa automáticamente a la fase de OTP y no vas a tener que copiar ningún dato manual.
             </div>
           )}
         </div>
@@ -519,13 +338,61 @@ export default function RemoteSessionPage() {
 
       {isViewer && isAccepted && (
         <div className="space-y-4 rounded-lg border bg-card p-6">
-          <p className="text-sm text-muted-foreground text-center">
-            {session.rustdesk_id
-              ? 'El usuario ya compartió sus datos de RustDesk. Abrí tu cliente nativo, conectate y luego marcá la sesión en curso.'
-              : 'El usuario aceptó la sesión. Esperá a que comparta su ID de RustDesk o pedile que lo cargue desde este panel.'}
-          </p>
+          {!isDeviceEnrolled ? (
+            <div className="space-y-4">
+              <div className="rounded-lg border border-yellow-200 bg-yellow-50 p-4 text-sm text-yellow-900">
+                <p className="font-medium">Este equipo todavía no tiene el agente instalado</p>
+                <p className="mt-2 text-xs">
+                  Generá un token de enrollment y compartile al usuario el comando según su sistema operativo. Cuando
+                  termine la instalación, esta pantalla se actualiza sola y vas a recibir el ID + OTP automáticos.
+                </p>
+              </div>
 
-          {session.rustdesk_id ? (
+              <button
+                onClick={handleGenerateEnrollment}
+                disabled={generatingEnrollment}
+                className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                {generatingEnrollment ? 'Generando…' : 'Generar token de enrollment'}
+              </button>
+
+              {enrollmentCommands && (
+                <div className="space-y-4 rounded-md border bg-muted/30 p-4 text-sm">
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-medium">macOS</p>
+                      <button
+                        onClick={() => void copyToClipboard('comando de macOS', enrollmentCommands.macCommand)}
+                        className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-background"
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                        Copiar comando
+                      </button>
+                    </div>
+                    <pre className="overflow-x-auto rounded-md bg-background p-3 text-xs">
+                      <code>{enrollmentCommands.macCommand}</code>
+                    </pre>
+                  </div>
+
+                  <div className="space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="font-medium">Windows</p>
+                      <button
+                        onClick={() => void copyToClipboard('comando de Windows', enrollmentCommands.windowsCommand)}
+                        className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-background"
+                      >
+                        <Copy className="h-3.5 w-3.5" />
+                        Copiar comando
+                      </button>
+                    </div>
+                    <pre className="overflow-x-auto rounded-md bg-background p-3 text-xs">
+                      <code>{enrollmentCommands.windowsCommand}</code>
+                    </pre>
+                  </div>
+                </div>
+              )}
+            </div>
+          ) : hasOtp ? (
             <div className="space-y-3 rounded-md border bg-muted/30 p-4 text-sm">
               {rustdesk.nativeSessionSummary && (
                 <div className="flex justify-end">
@@ -541,10 +408,10 @@ export default function RemoteSessionPage() {
 
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p>
-                  ID remoto: <strong>{session.rustdesk_id}</strong>
+                  ID remoto: <strong>{device?.rustdesk_id}</strong>
                 </p>
                 <button
-                  onClick={() => void copyToClipboard('ID de RustDesk', session.rustdesk_id)}
+                  onClick={() => void copyToClipboard('ID de RustDesk', device?.rustdesk_id)}
                   className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-background"
                 >
                   <Copy className="h-3.5 w-3.5" />
@@ -554,33 +421,37 @@ export default function RemoteSessionPage() {
 
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p>
-                  Contraseña: <strong>{session.rustdesk_password || 'no informada'}</strong>
+                  OTP temporal: <strong>{session.otp}</strong>
                 </p>
-                {session.rustdesk_password && (
-                  <button
-                    onClick={() => void copyToClipboard('contraseña de RustDesk', session.rustdesk_password)}
-                    className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-background"
-                  >
-                    <Copy className="h-3.5 w-3.5" />
-                    Copiar contraseña
-                  </button>
-                )}
+                <button
+                  onClick={() => void copyToClipboard('OTP temporal', session.otp)}
+                  className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-background"
+                >
+                  <Copy className="h-3.5 w-3.5" />
+                  Copiar OTP
+                </button>
               </div>
 
-              {session.rustdesk_platform && (
-                <p className="text-xs text-muted-foreground">Plataforma del usuario: {session.rustdesk_platform}</p>
+              {session.otp_expires_at && (
+                <p className="text-xs text-muted-foreground">
+                  Vence el {new Date(session.otp_expires_at).toLocaleString('es-ES')}
+                </p>
               )}
             </div>
           ) : (
-            <p className="rounded-md border border-dashed px-4 py-3 text-center text-sm text-muted-foreground">
-              Todavía no hay ID de RustDesk cargado.
-            </p>
+            <div className="rounded-md border border-dashed px-4 py-4 text-center text-sm text-muted-foreground">
+              <p>El agente ya está instalado.</p>
+              <p className="mt-1">
+                ID registrado: <strong className="text-foreground">{device?.rustdesk_id}</strong>
+              </p>
+              <p className="mt-1">Esperando que el agente genere la OTP automática…</p>
+            </div>
           )}
 
           <div className="flex flex-wrap items-center justify-center gap-3">
             <button
               onClick={() => void startAsViewer()}
-              disabled={!session.rustdesk_id}
+              disabled={!device?.rustdesk_id || !session.otp}
               className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-60"
             >
               Marcar sesión en curso
@@ -605,7 +476,7 @@ export default function RemoteSessionPage() {
         <div className="space-y-4 rounded-lg border bg-card p-6 text-center">
           <div className="space-y-2 text-sm text-muted-foreground">
             <p>Abrí tu cliente RustDesk local y conectate usando el ID del usuario.</p>
-            {session.rustdesk_id && (
+            {device?.rustdesk_id && (
               <button
                 onClick={() => void copyToClipboard('datos completos de RustDesk', rustdesk.nativeSessionSummary)}
                 className="inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs hover:bg-background"

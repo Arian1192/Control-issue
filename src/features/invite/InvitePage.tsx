@@ -183,8 +183,8 @@ export default function InvitePage() {
             <div className="space-y-1">
               <p className="font-medium">Qué va a pasar</p>
               <p className="text-muted-foreground">
-                Al autorizar, registramos este ordenador en la app y te llevamos al flujo para compartir tu ID de
-                RustDesk con soporte.
+                Al autorizar, registramos este ordenador en la app y te llevamos al flujo para dejar lista la
+                asistencia remota con soporte.
               </p>
             </div>
           </div>

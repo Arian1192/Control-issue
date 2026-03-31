@@ -153,31 +153,40 @@ export type Database = {
       }
       devices: {
         Row: {
+          agent_token_hash: string | null
           created_at: string
+          enrollment_token: string | null
           id: string
           ip_local: string | null
           is_online: boolean
           last_seen: string | null
           name: string
           owner_id: string
+          rustdesk_id: string | null
         }
         Insert: {
+          agent_token_hash?: string | null
           created_at?: string
+          enrollment_token?: string | null
           id?: string
           ip_local?: string | null
           is_online?: boolean
           last_seen?: string | null
           name: string
           owner_id: string
+          rustdesk_id?: string | null
         }
         Update: {
+          agent_token_hash?: string | null
           created_at?: string
+          enrollment_token?: string | null
           id?: string
           ip_local?: string | null
           is_online?: boolean
           last_seen?: string | null
           name?: string
           owner_id?: string
+          rustdesk_id?: string | null
         }
         Relationships: [
           {
@@ -358,9 +367,9 @@ export type Database = {
           id: string
           initiated_by: string
           issue_id: string | null
-          rustdesk_id: string | null
+          otp: string | null
+          otp_expires_at: string | null
           rustdesk_password: string | null
-          rustdesk_platform: string | null
           rustdesk_ready_at: string | null
           started_at: string | null
           status: SessionStatus
@@ -375,9 +384,9 @@ export type Database = {
           id?: string
           initiated_by: string
           issue_id?: string | null
-          rustdesk_id?: string | null
+          otp?: string | null
+          otp_expires_at?: string | null
           rustdesk_password?: string | null
-          rustdesk_platform?: string | null
           rustdesk_ready_at?: string | null
           started_at?: string | null
           status?: SessionStatus
@@ -392,9 +401,9 @@ export type Database = {
           id?: string
           initiated_by?: string
           issue_id?: string | null
-          rustdesk_id?: string | null
+          otp?: string | null
+          otp_expires_at?: string | null
           rustdesk_password?: string | null
-          rustdesk_platform?: string | null
           rustdesk_ready_at?: string | null
           started_at?: string | null
           status?: SessionStatus
@@ -448,9 +457,9 @@ export type Database = {
           id: string
           initiated_by: string
           issue_id: string | null
-          rustdesk_id: string | null
+          otp: string | null
+          otp_expires_at: string | null
           rustdesk_password: string | null
-          rustdesk_platform: string | null
           rustdesk_ready_at: string | null
           started_at: string | null
           status: SessionStatus
