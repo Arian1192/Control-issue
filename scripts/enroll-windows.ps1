@@ -13,9 +13,16 @@ $InstallDir = "C:\Program Files\Control Issue Agent"
 $ConfigDir  = "C:\ProgramData\control-issue-agent"
 $AgentExe   = "$InstallDir\control-issue-agent.exe"
 $ConfigFile = "$ConfigDir\config.toml"
+$AgentVersion = if ($env:CONTROL_ISSUE_AGENT_VERSION) { $env:CONTROL_ISSUE_AGENT_VERSION } else { "agent-bootstrap-2026-04-01" }
 
 Write-Host "==> Instalando RustDesk..." -ForegroundColor Cyan
-$RustDeskUrl = "https://github.com/rustdesk/rustdesk/releases/latest/download/rustdesk-windows-x86_64.exe"
+$RustDeskRelease = Invoke-RestMethod -Uri "https://api.github.com/repos/rustdesk/rustdesk/releases/latest"
+$RustDeskAsset = $RustDeskRelease.assets | Where-Object { $_.name -match '-x86_64\.exe$' } | Select-Object -First 1
+if (-not $RustDeskAsset) {
+    throw "No se pudo resolver un instalador RustDesk x86_64 desde el release más reciente."
+}
+
+$RustDeskUrl = $RustDeskAsset.browser_download_url
 $TmpInstaller = "$env:TEMP\rustdesk-installer.exe"
 Invoke-WebRequest -Uri $RustDeskUrl -OutFile $TmpInstaller
 Start-Process -FilePath $TmpInstaller -ArgumentList "/silent" -Wait
@@ -44,7 +51,13 @@ Write-Host "==> Instalando agente Control Issue..." -ForegroundColor Cyan
 New-Item -ItemType Directory -Path $InstallDir -Force | Out-Null
 New-Item -ItemType Directory -Path $ConfigDir -Force | Out-Null
 
-$AgentUrl = "https://github.com/Arian1192/Control-issue/releases/latest/download/control-issue-agent-windows-amd64.exe"
+$AgentUrl = "https://github.com/Arian1192/Control-issue/releases/download/$AgentVersion/control-issue-agent-windows-amd64.exe"
+try {
+    Invoke-WebRequest -Uri $AgentUrl -Method Head | Out-Null
+} catch {
+    throw "No se encontró el binario del agente en $AgentUrl. Verificá que exista el release/tag $AgentVersion."
+}
+
 Invoke-WebRequest -Uri $AgentUrl -OutFile $AgentExe
 
 # Crear configuración del agente
