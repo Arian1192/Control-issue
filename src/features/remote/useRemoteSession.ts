@@ -2,14 +2,15 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '@/lib/supabaseClient'
 import type { Database, SessionStatus } from '@/types'
 
+type DeviceRow = Database['public']['Tables']['devices']['Row']
+type Device = Pick<
+  DeviceRow,
+  'id' | 'name' | 'owner_id' | 'is_online' | 'last_seen' | 'ip_local' | 'created_at' | 'rustdesk_id'
+>
 type RemoteSession = Database['public']['Tables']['remote_sessions']['Row']
 type RemoteSessionUpdate = Database['public']['Tables']['remote_sessions']['Update']
 
-type PublishRustDeskPayload = {
-  rustdeskId: string
-  rustdeskPassword?: string | null
-  platform?: string | null
-}
+const DEVICE_SELECT_FIELDS = 'id, name, owner_id, is_online, last_seen, ip_local, created_at, rustdesk_id'
 
 function getEnv(name: string) {
   const value = (import.meta.env[name] as string | undefined)?.trim()
@@ -22,12 +23,6 @@ const RUSTDESK_KEY = getEnv('VITE_RUSTDESK_KEY')
 const RUSTDESK_WEB_CLIENT_ENABLED = getEnv('VITE_RUSTDESK_WEB_CLIENT_ENABLED') === 'true'
 const RUSTDESK_WEB_CLIENT_URL = getEnv('VITE_RUSTDESK_WEB_CLIENT_URL')
 const RUSTDESK_WEB_CLIENT_TEMPLATE = getEnv('VITE_RUSTDESK_WEB_CLIENT_TEMPLATE')
-const RUSTDESK_DOWNLOAD_WINDOWS_URL = getEnv('VITE_RUSTDESK_DOWNLOAD_WINDOWS_URL')
-const RUSTDESK_DOWNLOAD_MAC_INTEL_URL = getEnv('VITE_RUSTDESK_DOWNLOAD_MAC_INTEL_URL')
-const RUSTDESK_DOWNLOAD_MAC_ARM_URL = getEnv('VITE_RUSTDESK_DOWNLOAD_MAC_ARM_URL')
-const RUSTDESK_DOWNLOAD_LINUX_URL = getEnv('VITE_RUSTDESK_DOWNLOAD_LINUX_URL')
-const RUSTDESK_DOWNLOAD_ANDROID_URL = getEnv('VITE_RUSTDESK_DOWNLOAD_ANDROID_URL')
-const RUSTDESK_DOWNLOAD_IOS_URL = getEnv('VITE_RUSTDESK_DOWNLOAD_IOS_URL')
 const RUSTDESK_FORCE_PUBLIC_FALLBACK =
   getEnv('VITE_RUSTDESK_FORCE_PUBLIC_FALLBACK') === 'true' || RUSTDESK_ID_SERVER === 'rd.ariancoro.com'
 
@@ -35,17 +30,9 @@ const EFFECTIVE_ID_SERVER = RUSTDESK_FORCE_PUBLIC_FALLBACK ? undefined : RUSTDES
 const EFFECTIVE_RELAY_SERVER = RUSTDESK_FORCE_PUBLIC_FALLBACK ? undefined : RUSTDESK_RELAY_SERVER
 const EFFECTIVE_KEY = RUSTDESK_FORCE_PUBLIC_FALLBACK ? undefined : RUSTDESK_KEY
 
-const DEFAULT_RUSTDESK_DOWNLOAD_URL = 'https://github.com/rustdesk/rustdesk/releases/latest'
-const DEFAULT_WINDOWS_DOWNLOAD_URL = `${DEFAULT_RUSTDESK_DOWNLOAD_URL}`
-const DEFAULT_MAC_INTEL_DOWNLOAD_URL = `${DEFAULT_RUSTDESK_DOWNLOAD_URL}`
-const DEFAULT_MAC_ARM_DOWNLOAD_URL = `${DEFAULT_RUSTDESK_DOWNLOAD_URL}`
-const DEFAULT_LINUX_DOWNLOAD_URL = `${DEFAULT_RUSTDESK_DOWNLOAD_URL}`
-const DEFAULT_ANDROID_DOWNLOAD_URL = `${DEFAULT_RUSTDESK_DOWNLOAD_URL}`
-const DEFAULT_IOS_DOWNLOAD_URL = 'https://apps.apple.com/us/app/rustdesk-remote-desktop/id1581225015'
-
 const OPEN_STATUSES: SessionStatus[] = ['pendiente', 'aceptada', 'activa']
 
-function buildWebClientSessionUrl(rustdeskId?: string | null, rustdeskPassword?: string | null) {
+function buildWebClientSessionUrl(rustdeskId?: string | null, otp?: string | null) {
   if (!RUSTDESK_WEB_CLIENT_ENABLED) return ''
   if (RUSTDESK_FORCE_PUBLIC_FALLBACK) return ''
   if (!rustdeskId) return ''
@@ -55,18 +42,18 @@ function buildWebClientSessionUrl(rustdeskId?: string | null, rustdeskPassword?:
       .split('{id}')
       .join(encodeURIComponent(rustdeskId))
       .split('{password}')
-      .join(encodeURIComponent(rustdeskPassword ?? ''))
+      .join(encodeURIComponent(otp ?? ''))
   }
 
   return RUSTDESK_WEB_CLIENT_URL ?? ''
 }
 
-function buildNativeConnectionSummary(rustdeskId?: string | null, rustdeskPassword?: string | null) {
+function buildNativeConnectionSummary(rustdeskId?: string | null, otp?: string | null) {
   if (!rustdeskId) return ''
 
   const lines = [`ID remoto: ${rustdeskId}`]
-  if (rustdeskPassword?.trim()) {
-    lines.push(`Contraseña: ${rustdeskPassword.trim()}`)
+  if (otp?.trim()) {
+    lines.push(`OTP temporal: ${otp.trim()}`)
   }
 
   if (RUSTDESK_FORCE_PUBLIC_FALLBACK) {
@@ -90,6 +77,7 @@ function buildNativeConnectionSummary(rustdeskId?: string | null, rustdeskPasswo
 }
 
 export function useRemoteSession(sessionId: string | null, userId: string | null) {
+  const [device, setDevice] = useState<Device | null>(null)
   const [session, setSession] = useState<RemoteSession | null>(null)
   const [error, setError] = useState<string | null>(null)
 
@@ -119,6 +107,21 @@ export function useRemoteSession(sessionId: string | null, userId: string | null
     },
     [sessionId, syncLocalSession]
   )
+
+  const loadDevice = useCallback(async (deviceId: string) => {
+    const { data, error: loadError } = await supabase
+      .from('devices')
+      .select(DEVICE_SELECT_FIELDS)
+      .eq('id', deviceId)
+      .maybeSingle()
+
+    if (loadError) {
+      setError(loadError.message)
+      return
+    }
+
+    setDevice((data as Device | null) ?? null)
+  }, [])
 
   useEffect(() => {
     sessionRef.current = session
@@ -155,36 +158,41 @@ export function useRemoteSession(sessionId: string | null, userId: string | null
     }
   }, [sessionId])
 
+  useEffect(() => {
+    if (!session?.target_device_id) {
+      setDevice(null)
+      return
+    }
+
+    void loadDevice(session.target_device_id)
+
+    const channel = supabase
+      .channel(`remote_device:${session.target_device_id}`)
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'devices', filter: `id=eq.${session.target_device_id}` },
+        (payload) => setDevice(payload.new as Device)
+      )
+      .subscribe()
+
+    return () => {
+      void supabase.removeChannel(channel)
+    }
+  }, [loadDevice, session?.target_device_id])
+
   async function startAsSharer() {
     if (!sessionId || !userId) return
     setError(null)
     await updateSession({
       status: 'aceptada',
       accepted_at: sessionRef.current?.accepted_at ?? new Date().toISOString(),
-      connection_phase: 'awaiting-rustdesk-install',
+      connection_phase: device?.rustdesk_id ? 'awaiting-otp' : 'awaiting-rustdesk-install',
       failure_reason: null,
       ended_at: null,
-      rustdesk_id: null,
+      otp: null,
+      otp_expires_at: null,
       rustdesk_password: null,
       rustdesk_ready_at: null,
-      rustdesk_platform: null,
-    })
-  }
-
-  async function publishRustDeskConnection(payload: PublishRustDeskPayload) {
-    const rustdeskId = payload.rustdeskId.trim()
-    if (!rustdeskId) {
-      setError('Ingresá el ID de RustDesk antes de continuar.')
-      return false
-    }
-
-    return updateSession({
-      connection_phase: 'ready-for-technician',
-      failure_reason: null,
-      rustdesk_id: rustdeskId,
-      rustdesk_password: payload.rustdeskPassword?.trim() || null,
-      rustdesk_ready_at: new Date().toISOString(),
-      rustdesk_platform: payload.platform ?? null,
     })
   }
 
@@ -192,8 +200,13 @@ export function useRemoteSession(sessionId: string | null, userId: string | null
     if (!sessionId || !userId) return
     if (session?.status !== 'aceptada') return
 
-    if (!session?.rustdesk_id) {
-      setError('Todavía no recibiste el ID de RustDesk del usuario.')
+    if (!device?.rustdesk_id) {
+      setError('Este dispositivo todavía no tiene el agente instalado ni un ID de RustDesk registrado.')
+      return
+    }
+
+    if (!session?.otp) {
+      setError('Todavía no recibiste el OTP automático del agente.')
       return
     }
 
@@ -211,7 +224,10 @@ export function useRemoteSession(sessionId: string | null, userId: string | null
       status: 'rechazada',
       connection_phase: 'closing',
       failure_reason: null,
+      otp: null,
+      otp_expires_at: null,
       rustdesk_password: null,
+      rustdesk_ready_at: null,
       ended_at: new Date().toISOString(),
     })
   }
@@ -221,7 +237,10 @@ export function useRemoteSession(sessionId: string | null, userId: string | null
       status: 'cancelada',
       connection_phase: 'closing',
       failure_reason: null,
+      otp: null,
+      otp_expires_at: null,
       rustdesk_password: null,
+      rustdesk_ready_at: null,
       ended_at: new Date().toISOString(),
     })
   }
@@ -230,12 +249,16 @@ export function useRemoteSession(sessionId: string | null, userId: string | null
     await updateSession({
       status: finalStatus,
       connection_phase: 'closing',
+      otp: null,
+      otp_expires_at: null,
       rustdesk_password: null,
+      rustdesk_ready_at: null,
       ended_at: new Date().toISOString(),
     })
   }
 
   return {
+    device,
     session,
     error,
     rustdesk: {
@@ -247,19 +270,10 @@ export function useRemoteSession(sessionId: string | null, userId: string | null
       webClientEnabled: RUSTDESK_WEB_CLIENT_ENABLED,
       webClientUrl: RUSTDESK_WEB_CLIENT_ENABLED ? (RUSTDESK_WEB_CLIENT_URL ?? '') : '',
       webClientTemplate: RUSTDESK_WEB_CLIENT_TEMPLATE ?? '',
-      downloads: {
-        windows: RUSTDESK_DOWNLOAD_WINDOWS_URL ?? DEFAULT_WINDOWS_DOWNLOAD_URL,
-        macIntel: RUSTDESK_DOWNLOAD_MAC_INTEL_URL ?? DEFAULT_MAC_INTEL_DOWNLOAD_URL,
-        macArm: RUSTDESK_DOWNLOAD_MAC_ARM_URL ?? DEFAULT_MAC_ARM_DOWNLOAD_URL,
-        linux: RUSTDESK_DOWNLOAD_LINUX_URL ?? DEFAULT_LINUX_DOWNLOAD_URL,
-        android: RUSTDESK_DOWNLOAD_ANDROID_URL ?? DEFAULT_ANDROID_DOWNLOAD_URL,
-        ios: RUSTDESK_DOWNLOAD_IOS_URL ?? DEFAULT_IOS_DOWNLOAD_URL,
-      },
-      sessionWebClientUrl: buildWebClientSessionUrl(session?.rustdesk_id, session?.rustdesk_password),
-      nativeSessionSummary: buildNativeConnectionSummary(session?.rustdesk_id, session?.rustdesk_password),
+      sessionWebClientUrl: buildWebClientSessionUrl(device?.rustdesk_id, session?.otp),
+      nativeSessionSummary: buildNativeConnectionSummary(device?.rustdesk_id, session?.otp),
     },
     startAsSharer,
-    publishRustDeskConnection,
     startAsViewer,
     rejectSession,
     cancelSession,

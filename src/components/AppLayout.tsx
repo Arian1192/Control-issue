@@ -18,7 +18,13 @@ import type { Database } from '@/types'
 import { cn } from '@/lib/utils'
 
 type RemoteSession = Database['public']['Tables']['remote_sessions']['Row']
-type Device = Database['public']['Tables']['devices']['Row']
+type DeviceRow = Database['public']['Tables']['devices']['Row']
+type Device = Pick<
+  DeviceRow,
+  'id' | 'name' | 'owner_id' | 'is_online' | 'last_seen' | 'ip_local' | 'created_at' | 'rustdesk_id'
+>
+
+const DEVICE_SELECT_FIELDS = 'id, name, owner_id, is_online, last_seen, ip_local, created_at, rustdesk_id'
 
 interface NavItem {
   to: string
@@ -120,12 +126,12 @@ export default function AppLayout() {
     async function refreshDevicesAndPending() {
       const { data: devices } = await supabase
         .from('devices')
-        .select('*')
+        .select(DEVICE_SELECT_FIELDS)
         .eq('owner_id', profileId)
 
       if (!isMounted) return
 
-      const nextDevices = devices ?? []
+      const nextDevices = (devices as Device[] | null) ?? []
       ownedDeviceIds.clear()
       nextDevices.forEach((device) => ownedDeviceIds.add(device.id))
       setDevicesById(
@@ -240,7 +246,10 @@ export default function AppLayout() {
       .update({
         status: 'rechazada',
         connection_phase: 'closing',
+        otp: null,
+        otp_expires_at: null,
         rustdesk_password: null,
+        rustdesk_ready_at: null,
         ended_at: new Date().toISOString(),
       })
       .eq('id', sessionId)
